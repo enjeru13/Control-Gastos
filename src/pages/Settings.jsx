@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight, DollarSign, Moon, Key,
   Fingerprint, Bell, Upload, LogOut, Edit2,
 } from 'lucide-react'
 import { CURRENCIES } from '../constants/currencies'
+import { useAuth } from '../contexts/AuthContext'
 
 // ── Dark mode hook ────────────────────────────────────────
 
@@ -115,15 +117,24 @@ function CurrencyPicker({ current, onSelect, onClose }) {
 // ── Change password form ──────────────────────────────────
 
 function PasswordForm({ onClose }) {
-  const [form, setForm] = useState({ current: '', next: '', confirm: '' })
+  const { updatePassword } = useAuth()
+  const [form, setForm] = useState({ next: '', confirm: '' })
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  function handle(e) {
+  async function handle(e) {
     e.preventDefault()
     if (form.next.length < 8) return setError('Mínimo 8 caracteres')
     if (form.next !== form.confirm) return setError('Las contraseñas no coinciden')
-    // TODO: supabase.auth.updateUser({ password: form.next })
-    onClose()
+    setSaving(true)
+    try {
+      await updatePassword(form.next)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -136,10 +147,10 @@ function PasswordForm({ onClose }) {
         <div className="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-5" />
         <h3 className="text-base font-bold text-on-surface mb-5">Cambiar Contraseña</h3>
         <form onSubmit={handle} className="flex flex-col gap-4">
-          {['current', 'next', 'confirm'].map((field, i) => (
+          {[['next', 'Nueva contraseña'], ['confirm', 'Confirmar contraseña']].map(([field, label]) => (
             <div key={field} className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                {i === 0 ? 'Contraseña actual' : i === 1 ? 'Nueva contraseña' : 'Confirmar contraseña'}
+                {label}
               </label>
               <input
                 type="password"
@@ -153,9 +164,10 @@ function PasswordForm({ onClose }) {
           {error && <p className="text-xs text-error">{error}</p>}
           <button
             type="submit"
-            className="w-full py-4 rounded-xl bg-gradient-to-b from-primary to-surface-tint text-on-primary text-sm font-bold shadow-card mt-2 active:scale-[0.98] transition-all"
+            disabled={saving}
+            className="w-full py-4 rounded-xl bg-gradient-to-b from-primary to-surface-tint text-on-primary text-sm font-bold shadow-card mt-2 active:scale-[0.98] transition-all disabled:opacity-60"
           >
-            Actualizar Contraseña
+            {saving ? 'Guardando...' : 'Actualizar Contraseña'}
           </button>
         </form>
       </div>
@@ -166,26 +178,61 @@ function PasswordForm({ onClose }) {
 // ── Page ─────────────────────────────────────────────────
 
 export default function Settings() {
+  const { profile, user, signOut, updateFullName } = useAuth()
+  const navigate = useNavigate()
+
   const [dark, toggleDark] = useDarkMode()
   const [currency, setCurrency] = useState('USD')
   const [biometrics, setBiometrics] = useState(false)
   const [alerts, setAlerts] = useState(true)
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false)
   const [showPasswordForm, setShowPasswordForm] = useState(false)
-  const [name, setName] = useState('Usuario')
   const [editingName, setEditingName] = useState(false)
+  const [savingName, setSavingName] = useState(false)
   const nameRef = useRef(null)
   const csvRef = useRef(null)
+
+  // Derive display name from auth
+  const rawName =
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split('@')[0] ||
+    'Usuario'
+  const [name, setName] = useState(rawName)
+
+  // Sync name when profile loads
+  useEffect(() => {
+    setName(
+      profile?.full_name ||
+      user?.user_metadata?.full_name ||
+      user?.email?.split('@')[0] ||
+      'Usuario'
+    )
+  }, [profile, user])
 
   useEffect(() => {
     if (editingName) nameRef.current?.focus()
   }, [editingName])
 
+  async function handleNameSave() {
+    setEditingName(false)
+    if (name.trim() === rawName) return
+    setSavingName(true)
+    try { await updateFullName(name.trim()) }
+    catch { setName(rawName) }
+    finally { setSavingName(false) }
+  }
+
+  async function handleLogout() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
+
   function handleCsvImport(e) {
     const file = e.target.files?.[0]
     if (!file) return
     // TODO: parse CSV → preview → import to Supabase
-    alert(`Archivo seleccionado: ${file.name}\n(Importación se implementará con Supabase)`)
+    alert(`Archivo seleccionado: ${file.name}\n(Importación se implementará próximamente)`)
     e.target.value = ''
   }
 
@@ -223,19 +270,19 @@ export default function Settings() {
               ref={nameRef}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onBlur={() => setEditingName(false)}
-              onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
+              onBlur={handleNameSave}
+              onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
               className="text-xl font-bold text-on-surface bg-surface-container-low border border-primary rounded-lg px-3 py-1 outline-none w-full max-w-[200px]"
             />
           ) : (
             <h2
-              className="text-xl font-bold text-on-surface cursor-pointer hover:text-primary transition-colors"
+              className={['text-xl font-bold text-on-surface cursor-pointer hover:text-primary transition-colors', savingName ? 'opacity-60' : ''].join(' ')}
               onClick={() => setEditingName(true)}
             >
               {name}
             </h2>
           )}
-          <p className="text-sm text-on-surface-variant mt-0.5">usuario@email.com</p>
+          <p className="text-sm text-on-surface-variant mt-0.5">{user?.email ?? ''}</p>
         </div>
       </section>
 
@@ -350,9 +397,7 @@ export default function Settings() {
             label="Cerrar Sesión"
             danger
             divider={false}
-            onClick={() => {
-              // TODO: supabase.auth.signOut()
-            }}
+            onClick={handleLogout}
           />
         </div>
       </section>

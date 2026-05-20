@@ -2,29 +2,22 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronDown, ArrowDown, ArrowUp, CalendarDays } from 'lucide-react'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
+import { ChevronDown, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { getCurrencySymbol } from '../lib/currency'
 import { getIcon } from '../lib/categoryIcons'
+import { useCategories, useTransactions } from '../hooks/useTransactions'
 
 const CURRENCIES = ['USD', 'VES', 'COP']
 
 const schema = z.object({
   description: z.string().min(1, 'Requerido'),
   amount: z.coerce.number().positive('Debe ser mayor a 0'),
-  currency: z.enum(['USD', 'VES', 'COP', 'EUR']),
   category_id: z.string().min(1, 'Selecciona una categoría'),
   date: z.string().min(1, 'Requerido'),
   notes: z.string().optional(),
 })
 
-const MOCK_TXS = [
-  { id: 1, date: '2024-10-24', description: 'Almuerzo Sushi', category: 'Alimentación', categoryIcon: 'UtensilsCrossed', categoryColor: '#ef4444', amount: 35, currency: 'USD', type: 'expense', time: '14:30' },
-  { id: 2, date: '2024-10-24', description: 'Pago Proyecto Freelance', category: 'Freelance', categoryIcon: 'Laptop', categoryColor: '#10b981', amount: 850, currency: 'USD', type: 'income', time: '09:15' },
-  { id: 3, date: '2024-10-23', description: 'Gasolina', category: 'Transporte', categoryIcon: 'Car', categoryColor: '#f97316', amount: 1250000, currency: 'COP', type: 'expense', time: '18:45' },
-  { id: 4, date: '2024-10-23', description: 'Supermercado', category: 'Alimentación', categoryIcon: 'UtensilsCrossed', categoryColor: '#ef4444', amount: 2450, currency: 'VES', type: 'expense', time: '11:20' },
-  { id: 5, date: '2024-10-22', description: 'Salario Quincenal', category: 'Salario', categoryIcon: 'Briefcase', categoryColor: '#22c55e', amount: 1200, currency: 'USD', type: 'income', time: '09:00' },
-]
+// ── Helpers ────────────────────────────────────────────────
 
 function groupByDate(txs) {
   return txs.reduce((acc, tx) => {
@@ -42,42 +35,69 @@ function dateLabel(dateStr) {
   yesterday.setDate(yesterday.getDate() - 1)
   if (d >= today) return 'Hoy'
   if (d >= yesterday) return 'Ayer'
-  return new Intl.DateTimeFormat('es', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  }).format(d)
+  return new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' }).format(d)
 }
 
-function formatAmt(amount, currency) {
-  return new Intl.NumberFormat('es-VE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
+function formatAmt(amount) {
+  return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
 }
+
+function timeFromISO(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+// ── Page ───────────────────────────────────────────────────
 
 export default function Transactions() {
-  const [txType, setTxType] = useState('expense')
+  const [txType, setTxType]   = useState('expense')
   const [currency, setCurrency] = useState('USD')
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter]   = useState('all')
+  const [toast, setToast]     = useState(null)  // { type: 'success'|'error', msg }
 
-  const categories = txType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
+  const { categories } = useCategories()
+  const { transactions, loading: loadingTxs, saving, addTransaction } = useTransactions()
+
+  // Split categories by type
+  const visibleCats = categories.filter((c) => c.type === (txType === 'expense' ? 'expense' : 'income'))
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
+    watch,
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { currency: 'USD', date: new Date().toISOString().slice(0, 10) },
   })
 
-  function onSubmit(data) {
-    console.log({ ...data, type: txType, currency })
-    reset()
+  function showToast(type, msg) {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 3000)
   }
 
-  const filtered = MOCK_TXS.filter(
-    (tx) => filter === 'all' || tx.type === (filter === 'income' ? 'income' : 'expense')
+  async function onSubmit(data) {
+    const ok = await addTransaction({
+      type: txType,
+      amount: data.amount,
+      currency,
+      description: data.description,
+      category_id: data.category_id,
+      date: data.date,
+      notes: data.notes || null,
+    })
+    if (ok) {
+      reset({ currency: 'USD', date: new Date().toISOString().slice(0, 10) })
+      showToast('success', 'Movimiento guardado')
+    } else {
+      showToast('error', 'Error al guardar')
+    }
+  }
+
+  const filtered = transactions.filter(
+    (tx) => filter === 'all' || tx.type === filter
   )
   const grouped = groupByDate(filtered)
 
@@ -90,9 +110,7 @@ export default function Transactions() {
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-secondary-container rounded-full blur-3xl opacity-40 pointer-events-none" />
 
           <div className="flex items-center gap-2.5 relative z-10">
-            <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center text-sm font-bold">
-              +
-            </div>
+            <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center text-sm font-bold">+</div>
             <h2 className="text-lg font-bold text-on-surface">Registrar</h2>
           </div>
 
@@ -107,9 +125,7 @@ export default function Transactions() {
                   onClick={() => setTxType(t)}
                   className={[
                     'flex-1 py-2 text-center rounded-lg text-sm font-semibold transition-all',
-                    txType === t
-                      ? 'bg-surface shadow-sm text-primary'
-                      : 'text-on-surface-variant hover:text-on-surface',
+                    txType === t ? 'bg-surface shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface',
                   ].join(' ')}
                 >
                   {t === 'expense' ? 'Egreso' : 'Ingreso'}
@@ -119,47 +135,33 @@ export default function Transactions() {
 
             {/* Amount */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                Monto
-              </label>
+              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">Monto</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-on-surface-variant">
                   {getCurrencySymbol(currency)}
                 </span>
                 <input
                   {...register('amount')}
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
+                  type="number" step="0.01" placeholder="0.00"
                   className={[
                     'w-full bg-surface-container-low border rounded-xl pl-10 pr-4 py-3.5 text-lg font-bold text-on-surface outline-none transition-all placeholder:text-outline font-currency',
-                    errors.amount
-                      ? 'border-error focus:ring-2 focus:ring-error/20'
-                      : 'border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10',
+                    errors.amount ? 'border-error focus:ring-2 focus:ring-error/20' : 'border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10',
                   ].join(' ')}
                 />
               </div>
-              {errors.amount && (
-                <span className="text-xs text-error">{errors.amount.message}</span>
-              )}
+              {errors.amount && <span className="text-xs text-error">{errors.amount.message}</span>}
             </div>
 
             {/* Currency */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                Moneda
-              </label>
+              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">Moneda</label>
               <div className="flex gap-2">
                 {CURRENCIES.map((c) => (
                   <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCurrency(c)}
+                    key={c} type="button" onClick={() => setCurrency(c)}
                     className={[
                       'flex-1 py-2.5 rounded-xl text-sm font-bold transition-all',
-                      currency === c
-                        ? 'bg-primary-container text-on-primary-container'
-                        : 'bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low',
+                      currency === c ? 'bg-primary-container text-on-primary-container' : 'bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low',
                     ].join(' ')}
                   >
                     {c}
@@ -170,69 +172,47 @@ export default function Transactions() {
 
             {/* Description */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                Descripción
-              </label>
+              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">Descripción</label>
               <input
                 {...register('description')}
-                type="text"
-                placeholder="Ej. Almuerzo con cliente"
+                type="text" placeholder="Ej. Almuerzo con cliente"
                 className={[
                   'w-full bg-surface-container-low border rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all placeholder:text-outline',
-                  errors.description
-                    ? 'border-error focus:ring-2 focus:ring-error/20'
-                    : 'border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10',
+                  errors.description ? 'border-error focus:ring-2 focus:ring-error/20' : 'border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10',
                 ].join(' ')}
               />
-              {errors.description && (
-                <span className="text-xs text-error">{errors.description.message}</span>
-              )}
+              {errors.description && <span className="text-xs text-error">{errors.description.message}</span>}
             </div>
 
             {/* Category */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                Categoría
-              </label>
+              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">Categoría</label>
               <div className="relative">
                 <select
                   {...register('category_id')}
                   className={[
                     'w-full appearance-none bg-surface-container-low border rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all cursor-pointer',
-                    errors.category_id
-                      ? 'border-error'
-                      : 'border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10',
+                    errors.category_id ? 'border-error' : 'border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10',
                   ].join(' ')}
                 >
                   <option value="">Selecciona una categoría</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
+                  {visibleCats.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-                <ChevronDown
-                  size={16}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
-                />
+                <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
               </div>
-              {errors.category_id && (
-                <span className="text-xs text-error">{errors.category_id.message}</span>
-              )}
+              {errors.category_id && <span className="text-xs text-error">{errors.category_id.message}</span>}
             </div>
 
             {/* Date */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                Fecha
-              </label>
-              <div className="relative">
-                <input
-                  {...register('date')}
-                  type="date"
-                  className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-              </div>
+              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">Fecha</label>
+              <input
+                {...register('date')}
+                type="date"
+                className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
+              />
             </div>
 
             {/* Notes */}
@@ -242,20 +222,31 @@ export default function Transactions() {
               </label>
               <input
                 {...register('notes')}
-                type="text"
-                placeholder="Ej. Compartido con Juan"
+                type="text" placeholder="Ej. Compartido con Juan"
                 className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10 placeholder:text-outline"
               />
             </div>
 
             <button
               type="submit"
-              className="mt-2 w-full py-4 rounded-xl bg-gradient-to-b from-primary to-surface-tint text-on-primary text-sm font-bold shadow-card hover:shadow-overlay transition-all active:scale-[0.98]"
+              disabled={saving}
+              className="mt-2 w-full py-4 rounded-xl bg-gradient-to-b from-primary to-surface-tint text-on-primary text-sm font-bold shadow-card hover:shadow-overlay transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              Guardar Movimiento
+              {saving ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : 'Guardar Movimiento'}
             </button>
           </form>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className={[
+            'mt-3 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold shadow-card transition-all',
+            toast.type === 'success' ? 'bg-primary-container text-on-primary-container' : 'bg-error-container text-on-error-container',
+          ].join(' ')}>
+            {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+            {toast.msg}
+          </div>
+        )}
       </section>
 
       {/* ── HISTORY ── */}
@@ -268,9 +259,9 @@ export default function Transactions() {
               <h2 className="text-lg font-bold text-on-surface">Historial</h2>
               <p className="text-xs text-on-surface-variant mt-0.5">
                 {new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(new Date())}
+                {' · '}{transactions.length} movimiento{transactions.length !== 1 ? 's' : ''}
               </p>
             </div>
-            {/* Filters */}
             <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
               {[
                 { key: 'all', label: 'Todos' },
@@ -282,9 +273,7 @@ export default function Transactions() {
                   onClick={() => setFilter(key)}
                   className={[
                     'px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0',
-                    filter === key
-                      ? 'bg-primary-container text-on-primary-container'
-                      : 'bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low',
+                    filter === key ? 'bg-primary-container text-on-primary-container' : 'bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low',
                   ].join(' ')}
                 >
                   {label}
@@ -295,53 +284,59 @@ export default function Transactions() {
 
           {/* List */}
           <div className="p-4 flex flex-col gap-1 overflow-y-auto max-h-[520px]">
-            {Object.entries(grouped).map(([date, txs]) => (
-              <div key={date}>
-                <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-2 py-2 mt-2 first:mt-0">
-                  {dateLabel(date)}, {new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' }).format(new Date(date + 'T00:00:00'))}
-                </div>
-                {txs.map((tx) => {
-                  const Icon = getIcon(tx.categoryIcon)
-                  return (
-                    <div
-                      key={tx.id}
-                      className="flex items-center justify-between p-3 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: tx.categoryColor + '1a' }}
-                        >
-                          <Icon size={18} style={{ color: tx.categoryColor }} />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-on-surface leading-tight">
-                            {tx.description}
-                          </span>
-                          <span className="text-xs text-on-surface-variant">
-                            {tx.category} · {tx.time}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 ml-2">
-                        <div
-                          className={[
-                            'text-sm font-bold font-currency',
-                            tx.type === 'income' ? 'text-primary' : 'text-on-surface',
-                          ].join(' ')}
-                        >
-                          {tx.type === 'income' ? '+' : '-'}
-                          {formatAmt(tx.amount, tx.currency)}
-                        </div>
-                        <div className="text-[10px] text-on-surface-variant font-semibold">
-                          {tx.currency}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+            {loadingTxs ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 size={24} className="animate-spin text-primary" />
               </div>
-            ))}
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+                <div className="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center">
+                  <ChevronDown size={20} className="text-on-surface-variant" />
+                </div>
+                <p className="text-sm font-semibold text-on-surface-variant">Sin movimientos aún</p>
+                <p className="text-xs text-on-surface-variant opacity-70">Registra tu primer movimiento</p>
+              </div>
+            ) : (
+              Object.entries(grouped).map(([date, txs]) => (
+                <div key={date}>
+                  <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-2 py-2 mt-2 first:mt-0">
+                    {dateLabel(date)}, {new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' }).format(new Date(date + 'T00:00:00'))}
+                  </div>
+                  {txs.map((tx) => {
+                    const cat = tx.categories
+                    const Icon = getIcon(cat?.icon)
+                    const color = cat?.color ?? '#6b7280'
+                    return (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between p-3 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: color + '1a' }}
+                          >
+                            <Icon size={18} style={{ color }} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-on-surface leading-tight">{tx.description}</span>
+                            <span className="text-xs text-on-surface-variant">
+                              {cat?.name ?? 'Sin categoría'} · {timeFromISO(tx.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <div className={['text-sm font-bold font-currency', tx.type === 'income' ? 'text-primary' : 'text-on-surface'].join(' ')}>
+                            {tx.type === 'income' ? '+' : '-'}{formatAmt(tx.amount)}
+                          </div>
+                          <div className="text-[10px] text-on-surface-variant font-semibold">{tx.currency}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
