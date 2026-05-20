@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  /* Font */
+  --font-sans: "Manrope", sans-serif;
+
+  /* Colors - Design System */
+  --color-surface: #f9f9ff;
+  --color-surface-dim: #cfdaf2;
+  --color-surface-bright: #f9f9ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f0f3ff;
+  --color-surface-container: #e7eeff;
+  --color-surface-container-high: #dee8ff;
+  --color-surface-container-highest: #d8e3fb;
+  --color-on-surface: #111c2d;
+  --color-on-surface-variant: #40484c;
+  --color-inverse-surface: #263143;
+  --color-inverse-on-surface: #ecf1ff;
+  --color-outline: #70787c;
+  --color-outline-variant: #bfc8cc;
+  --color-surface-tint: #1b667c;
+
+  --color-primary: #1b667c;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #64a6bd;
+  --color-on-primary-container: #003a48;
+  --color-inverse-primary: #8ed0e8;
+
+  --color-secondary: #496079;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #cae2ff;
+  --color-on-secondary-container: #4d657d;
+
+  --color-tertiary: #5f5b79;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #9f99ba;
+  --color-on-tertiary-container: #35314d;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-success: #2e7d32;
+  --color-on-success: #ffffff;
+  --color-success-container: #dcfce7;
+  --color-on-success-container: #14532d;
+
+  --color-background: #f9f9ff;
+  --color-on-background: #111c2d;
+  --color-surface-variant: #d8e3fb;
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Shadows (powder-blue tinted) */
+  --shadow-card: 0 4px 24px 0 rgb(144 168 195 / 0.15);
+  --shadow-overlay: 0 8px 32px 0 rgb(144 168 195 / 0.25);
+}
+
+/* Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Manrope", sans-serif;
+  background-color: #f9f9ff;
+  color: #111c2d;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Currency numbers - tabular figures */
+.font-currency {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-weight: 700;
+}
+
+/* Card surface */
+.card {
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 24px 0 rgb(144 168 195 / 0.15);
+}
+
+/* Safe area (iOS notch + home indicator) */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+}
+
+/* Scrollbar thin */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #bfc8cc;
+  border-radius: 9999px;
+}
