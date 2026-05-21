@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 const initial = {
   recentTransactions: [],
   categoryTotals: [],
+  incomeTotals: [],
   totalDebt: 0,
   totalDebtPaid: 0,
   totalSavings: 0,
@@ -76,11 +77,27 @@ export function useDashboard() {
         value: totalCount > 0 ? Math.round((count / totalCount) * 100) : 0,
       }));
 
+    const incomeMap = {};
+    for (const tx of transactions) {
+      if (tx.type !== "income" || tx.date < cutoffStr) continue;
+      const name = tx.categories?.name ?? "Otros";
+      incomeMap[name] = (incomeMap[name] ?? 0) + 1;
+    }
+    const incomeTotalCount = Object.values(incomeMap).reduce((s, v) => s + v, 0);
+    const incomeTotals = Object.entries(incomeMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({
+        name,
+        value: incomeTotalCount > 0 ? Math.round((count / incomeTotalCount) * 100) : 0,
+      }));
+
     dispatch({
       type: "LOAD_OK",
       payload: {
         recentTransactions: transactions.slice(0, 5),
         categoryTotals,
+        incomeTotals,
         totalDebt:     debts.reduce((s, d) => s + (Number(d.total_amount) - Number(d.paid_amount)), 0),
         totalDebtPaid: debts.reduce((s, d) => s + Number(d.paid_amount), 0),
         totalSavings:  goals.reduce((s, g) => s + Number(g.current_amount), 0),

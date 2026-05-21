@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ChevronDown, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { getCurrencySymbol } from "../lib/currency";
 import { getIcon } from "../lib/categoryIcons";
 import { useCategories, useTransactions } from "../hooks/useTransactions";
@@ -65,7 +66,6 @@ export default function Transactions() {
   const [txType, setTxType] = useState("expense");
   const [currency, setCurrency] = useState("USD");
   const [filter, setFilter] = useState("all");
-  const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
 
   const { categories } = useCategories();
   const {
@@ -93,11 +93,6 @@ export default function Transactions() {
     },
   });
 
-  function showToast(type, msg) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3000);
-  }
-
   async function onSubmit(data) {
     const ok = await addTransaction({
       type: txType,
@@ -110,9 +105,9 @@ export default function Transactions() {
     });
     if (ok) {
       reset({ currency: "USD", date: new Date().toISOString().slice(0, 10) });
-      showToast("success", "Movimiento guardado");
+      toast.success("Movimiento guardado");
     } else {
-      showToast("error", "Error al guardar");
+      toast.error("Error al guardar el movimiento");
     }
   }
 
@@ -309,24 +304,6 @@ export default function Transactions() {
           </form>
         </div>
 
-        {/* Toast */}
-        {toast && (
-          <div
-            className={[
-              "mt-3 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold shadow-card transition-all",
-              toast.type === "success"
-                ? "bg-primary-container text-on-primary-container"
-                : "bg-error-container text-on-error-container",
-            ].join(" ")}
-          >
-            {toast.type === "success" ? (
-              <CheckCircle2 size={16} />
-            ) : (
-              <AlertCircle size={16} />
-            )}
-            {toast.msg}
-          </div>
-        )}
       </section>
 
       {/* ── HISTORY ── */}

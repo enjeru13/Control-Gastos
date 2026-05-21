@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm install *)",
       "Bash(npm run *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(grep -n \"pwa\\\\|registerSW\\\\|workbox\" vite.config.js)",
+      "Bash(grep -rn \"registerSW\\\\|useRegisterSW\" src/)"
     ]
   }
 }

@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import Header from "./Header";
 import BottomNav from "./BottomNav";
 import PageTransition from "./PageTransition";
+import UpdatePrompt from "../ui/UpdatePrompt";
 
 const PULL_THRESHOLD = 72;
 const PULL_MAX = 100;
@@ -71,6 +72,7 @@ export default function Layout() {
       </main>
 
       <BottomNav />
+      <UpdatePrompt />
     </div>
   );
 }

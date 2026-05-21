@@ -84,6 +84,16 @@ export function AuthProvider({ children }) {
     setProfile((p) => ({ ...p, full_name: fullName }));
   }
 
+  async function updateCurrency(code) {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ default_currency: code })
+      .eq("id", user.id);
+    if (error) throw error;
+    setProfile((p) => ({ ...p, default_currency: code }));
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -95,6 +105,7 @@ export function AuthProvider({ children }) {
         signOut,
         updatePassword,
         updateFullName,
+        updateCurrency,
       }}
     >
       {children}

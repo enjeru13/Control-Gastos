@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Plus,
   MoreVertical,
@@ -122,6 +123,7 @@ function AportarSheet({ open, goal, onClose, onSave }) {
         Number(goal.target_amount),
       );
       await onSave(goal.id, { current_amount: newAmount });
+      toast.success("Aporte registrado");
       setAmount("");
       onClose();
     } catch (err) {
@@ -208,6 +210,7 @@ function AbonarSheet({ open, debt, onClose, onSave }) {
         Number(debt.total_amount),
       );
       await onSave(debt.id, { paid_amount: newPaid });
+      toast.success("Abono registrado");
       setAmount("");
       onClose();
     } catch (err) {
@@ -333,6 +336,7 @@ function AddGoalSheet({ open, onClose, onSave, defaultValues = null }) {
         icon: form.icon,
         color: "#1b667c",
       });
+      toast.success("Meta creada");
       setForm(BLANK_GOAL);
       onClose();
     } catch (err) {
@@ -469,6 +473,7 @@ function AddDebtSheet({ open, onClose, onSave }) {
         due_date: form.due_date || null,
         color: DEBT_TYPE_META[form.type]?.color ?? "#ba1a1a",
       });
+      toast.success("Deuda registrada");
       setForm({
         name: "",
         type: "credit_card",
@@ -637,6 +642,7 @@ function AddWishlistSheet({ open, onClose, onSave }) {
         priority: form.priority,
         description: form.description || null,
       });
+      toast.success("Ítem agregado a la wishlist");
       setForm({
         name: "",
         price: "",

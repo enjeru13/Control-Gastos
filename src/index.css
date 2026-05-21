@@ -1,55 +1,63 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   /* Font */
   --font-sans: "Manrope", sans-serif;
 
-  /* Colors - Design System */
-  --color-surface: #f9f9ff;
-  --color-surface-dim: #cfdaf2;
-  --color-surface-bright: #f9f9ff;
+  /* ── Light mode tokens ───────────────────────────────── */
+
+  /* Surfaces — indigo-tinted white */
+  --color-background: #f8f7ff;
+  --color-on-background: #1a1740;
+  --color-surface: #f8f7ff;
+  --color-surface-dim: #d9d6f2;
+  --color-surface-bright: #f8f7ff;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f0f3ff;
-  --color-surface-container: #e7eeff;
-  --color-surface-container-high: #dee8ff;
-  --color-surface-container-highest: #d8e3fb;
-  --color-on-surface: #111c2d;
-  --color-on-surface-variant: #40484c;
-  --color-inverse-surface: #263143;
-  --color-inverse-on-surface: #ecf1ff;
-  --color-outline: #70787c;
-  --color-outline-variant: #bfc8cc;
-  --color-surface-tint: #1b667c;
+  --color-surface-container-low: #f3f0ff;
+  --color-surface-container: #edebff;
+  --color-surface-container-high: #e4e1ff;
+  --color-surface-container-highest: #d9d6f2;
+  --color-surface-variant: #e4e1ff;
+  --color-on-surface: #1a1740;
+  --color-on-surface-variant: #46434f;
+  --color-inverse-surface: #302e4a;
+  --color-inverse-on-surface: #f3f0ff;
+  --color-outline: #787580;
+  --color-outline-variant: #c9c5d1;
+  --color-surface-tint: #4f46e5;
 
-  --color-primary: #1b667c;
+  /* Primary — Indigo */
+  --color-primary: #4f46e5;
   --color-on-primary: #ffffff;
-  --color-primary-container: #64a6bd;
-  --color-on-primary-container: #003a48;
-  --color-inverse-primary: #8ed0e8;
+  --color-primary-container: #e0e7ff;
+  --color-on-primary-container: #1e1b4b;
+  --color-inverse-primary: #a5b4fc;
+  --color-primary-fixed: #e0e7ff;
 
-  --color-secondary: #496079;
+  /* Secondary — muted violet-slate */
+  --color-secondary: #5e5b6e;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #cae2ff;
-  --color-on-secondary-container: #4d657d;
+  --color-secondary-container: #e4e0f9;
+  --color-on-secondary-container: #1a1827;
 
-  --color-tertiary: #5f5b79;
+  /* Tertiary — warm rose-purple */
+  --color-tertiary: #7b5274;
   --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #9f99ba;
-  --color-on-tertiary-container: #35314d;
+  --color-tertiary-container: #ffd7f6;
+  --color-on-tertiary-container: #2f0e2b;
 
+  /* Error */
   --color-error: #ba1a1a;
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
 
+  /* Success */
   --color-success: #2e7d32;
   --color-on-success: #ffffff;
   --color-success-container: #dcfce7;
   --color-on-success-container: #14532d;
-
-  --color-background: #f9f9ff;
-  --color-on-background: #111c2d;
-  --color-surface-variant: #d8e3fb;
 
   /* Radius */
   --radius-sm: 0.25rem;
@@ -58,9 +66,9 @@
   --radius-xl: 1.5rem;
   --radius-full: 9999px;
 
-  /* Shadows (powder-blue tinted) */
-  --shadow-card: 0 4px 24px 0 rgb(144 168 195 / 0.15);
-  --shadow-overlay: 0 8px 32px 0 rgb(144 168 195 / 0.25);
+  /* Shadows — indigo-tinted */
+  --shadow-card: 0 4px 24px 0 rgb(99 102 241 / 0.12);
+  --shadow-overlay: 0 8px 32px 0 rgb(99 102 241 / 0.20);
 }
 
 /* Base */
@@ -79,10 +87,11 @@ body,
 
 body {
   font-family: "Manrope", sans-serif;
-  background-color: #f9f9ff;
-  color: #111c2d;
+  background-color: var(--color-background, #f8f7ff);
+  color: var(--color-on-surface, #1a1740);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Currency numbers - tabular figures */
@@ -94,9 +103,9 @@ body {
 
 /* Card surface */
 .card {
-  background: #ffffff;
+  background: var(--color-surface);
   border-radius: 1rem;
-  box-shadow: 0 4px 24px 0 rgb(144 168 195 / 0.15);
+  box-shadow: var(--shadow-card);
 }
 
 /* Safe area (iOS notch + home indicator) */
@@ -116,6 +125,127 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #bfc8cc;
+  background: #c9c5d1;
   border-radius: 9999px;
+}
+
+/* ── Dark mode — token overrides ────────────────────────── */
+.dark {
+  /* Surfaces — indigo-tinted dark */
+  --color-background: #0e0d1a;
+  --color-on-background: #e5e0ff;
+  --color-surface: #13111f;
+  --color-surface-dim: #0e0d1a;
+  --color-surface-bright: #242240;
+  --color-surface-container-lowest: #090813;
+  --color-surface-container-low: #1a1830;
+  --color-surface-container: #211f38;
+  --color-surface-container-high: #2a2843;
+  --color-surface-container-highest: #33314f;
+  --color-surface-variant: #46434f;
+  --color-on-surface: #e5e0ff;
+  --color-on-surface-variant: #c9c5d1;
+  --color-inverse-surface: #e5e0ff;
+  --color-inverse-on-surface: #13111f;
+  --color-outline: #928fa0;
+  --color-outline-variant: #46434f;
+  --color-surface-tint: #818cf8;
+
+  /* Primary — bright indigo over dark */
+  --color-primary: #818cf8;
+  --color-on-primary: #1e1b4b;
+  --color-primary-container: #3730a3;
+  --color-on-primary-container: #e0e7ff;
+  --color-primary-fixed: #e0e7ff;
+  --color-inverse-primary: #4f46e5;
+
+  /* Secondary */
+  --color-secondary: #cac5dc;
+  --color-on-secondary: #312e42;
+  --color-secondary-container: #484459;
+  --color-on-secondary-container: #e4e0f9;
+
+  /* Tertiary */
+  --color-tertiary: #f1b8e8;
+  --color-on-tertiary: #492343;
+  --color-tertiary-container: #623a5b;
+  --color-on-tertiary-container: #ffd7f6;
+
+  /* Error */
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  /* Success */
+  --color-success: #81c784;
+  --color-on-success: #0a3d0c;
+  --color-success-container: #1b5e20;
+  --color-on-success-container: #c8f5cb;
+
+  /* Shadows — deeper, no tint */
+  --shadow-card: 0 4px 24px 0 rgb(0 0 0 / 0.40);
+  --shadow-overlay: 0 8px 32px 0 rgb(0 0 0 / 0.60);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #46434f;
+}
+
+/* ── Sonner toasts — light ──────────────────────────────── */
+:root {
+  --normal-bg: #f8f7ff;
+  --normal-border: #c9c5d1;
+  --normal-text: #1a1740;
+  --success-bg: #dcfce7;
+  --success-border: #2e7d32;
+  --success-text: #14532d;
+  --error-bg: #ffdad6;
+  --error-border: #ba1a1a;
+  --error-text: #93000a;
+  --info-bg: #e0e7ff;
+  --info-border: #4f46e5;
+  --info-text: #1e1b4b;
+  --warning-bg: #fff8e1;
+  --warning-border: #d97706;
+  --warning-text: #78350f;
+}
+
+[data-sonner-toaster] {
+  --border-radius: 1rem !important;
+  --normal-bg: #f8f7ff !important;
+  --normal-border: #c9c5d1 !important;
+  --normal-text: #1a1740 !important;
+  --success-bg: #dcfce7 !important;
+  --success-border: #2e7d32 !important;
+  --success-text: #14532d !important;
+  --error-bg: #ffdad6 !important;
+  --error-border: #ba1a1a !important;
+  --error-text: #93000a !important;
+  --info-bg: #e0e7ff !important;
+  --info-border: #4f46e5 !important;
+  --info-text: #1e1b4b !important;
+  --warning-bg: #fff8e1 !important;
+  --warning-border: #d97706 !important;
+  --warning-text: #78350f !important;
+}
+
+/* ── Sonner toasts — dark ───────────────────────────────── */
+.dark [data-sonner-toaster],
+.dark [data-sonner-toast] {
+  --normal-bg: #211f38 !important;
+  --normal-border: #46434f !important;
+  --normal-text: #e5e0ff !important;
+  --success-bg: #1b5e20 !important;
+  --success-border: #2e7d32 !important;
+  --success-text: #c8f5cb !important;
+  --error-bg: #690005 !important;
+  --error-border: #ffb4ab !important;
+  --error-text: #ffdad6 !important;
+  --info-bg: #3730a3 !important;
+  --info-border: #818cf8 !important;
+  --info-text: #e0e7ff !important;
+  --warning-bg: #3d2800 !important;
+  --warning-border: #d97706 !important;
+  --warning-text: #fde68a !important;
 }

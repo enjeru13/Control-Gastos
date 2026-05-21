@@ -10,7 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { useDashboard } from "../hooks/useDashboard";
 import { getIcon } from "../lib/categoryIcons";
 
-const PIE_COLORS = ["#1b667c", "#64a6bd", "#9f99ba", "#8ed0e8", "#c9c2e5"];
+const PIE_COLORS = ["#4f46e5", "#818cf8", "#a5b4fc", "#6366f1", "#c7d2fe"];
+const INCOME_COLORS = ["#2e7d32", "#4caf50", "#81c784", "#388e3c", "#a5d6a7"];
 
 const CURRENCY_BALANCES = [
   { code: "VES", display: "Bs. —" },
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const {
     recentTransactions,
     categoryTotals,
+    incomeTotals,
     totalDebt,
     totalDebtPaid,
     totalSavings,
@@ -61,8 +63,9 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6">
       {/* ── Hero Balance ── */}
       <section className="flex flex-col gap-3">
-        <div className="relative overflow-hidden rounded-2xl p-6 bg-linear-to-br from-primary to-tertiary-container text-on-primary">
-          <div className="absolute top-[-40%] right-[-8%] w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl p-6 bg-linear-to-br from-primary to-tertiary-container text-on-primary dark:bg-none dark:bg-surface-container-high dark:border dark:border-primary/30 dark:text-on-surface">
+          <div className="absolute top-[-40%] right-[-8%] w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none dark:hidden" />
+          <div className="absolute top-[-40%] right-[-8%] w-56 h-56 bg-primary/10 rounded-full blur-2xl pointer-events-none hidden dark:block" />
           <div className="relative z-10 flex flex-col gap-1">
             <span className="text-xs font-semibold tracking-wider opacity-80 uppercase">
               Saldo Total Estimado
@@ -116,13 +119,13 @@ export default function Dashboard() {
             )}
           </div>
           <div>
-            <p className="text-[10px] font-bold text-primary/70 uppercase tracking-wide">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">
               Ahorros
             </p>
-            <p className="text-lg font-bold text-primary font-currency mt-0.5">
+            <p className="text-lg font-bold text-on-surface font-currency mt-0.5">
               {loading ? "—" : `$ ${fmtAmt(totalSavings)}`}
             </p>
-            <p className="text-[10px] text-primary/60 mt-0.5">
+            <p className="text-[10px] text-on-surface-variant mt-0.5">
               {loading ? "" : `de $ ${fmtAmt(savingsTarget)} meta`}
             </p>
           </div>
@@ -179,13 +182,11 @@ export default function Dashboard() {
         </button>
       </section>
 
-      {/* ── Charts + Transactions ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Pie chart */}
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Gastos por Categoría */}
         <section className="bg-surface rounded-2xl p-5 shadow-card flex flex-col gap-4">
-          <h3 className="text-base font-bold text-on-surface">
-            Gastos por Categoría
-          </h3>
+          <h3 className="text-base font-bold text-on-surface">Gastos por Categoría</h3>
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 size={24} className="animate-spin text-primary" />
@@ -193,70 +194,35 @@ export default function Dashboard() {
           ) : (
             <div className="flex items-center gap-4">
               <div className="w-32 h-32 shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width={128} height={128}>
                   <PieChart>
                     <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={28}
-                      outerRadius={56}
-                      dataKey="value"
-                      strokeWidth={0}
+                      data={categoryTotals.length > 0 ? categoryTotals : [{ name: "Sin datos", value: 100 }]}
+                      cx="50%" cy="50%"
+                      innerRadius={28} outerRadius={56}
+                      dataKey="value" strokeWidth={0}
                     >
-                      {pieData.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={
-                            categoryTotals.length === 0
-                              ? "#e7eeff"
-                              : PIE_COLORS[i % PIE_COLORS.length]
-                          }
-                        />
+                      {(categoryTotals.length > 0 ? categoryTotals : [{}]).map((_, i) => (
+                        <Cell key={i} fill={categoryTotals.length === 0 ? "#edebff" : PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     {categoryTotals.length > 0 && (
-                      <Tooltip
-                        formatter={(v, name) => [`${v}%`, name]}
-                        contentStyle={{
-                          borderRadius: "0.75rem",
-                          border: "none",
-                          boxShadow: "0 4px 24px rgb(144 168 195/0.2)",
-                          fontSize: "12px",
-                        }}
-                      />
+                      <Tooltip formatter={(v, name) => [`${v}%`, name]} contentStyle={{ borderRadius: "0.75rem", border: "none", boxShadow: "0 4px 24px rgb(99 102 241/0.15)", fontSize: "12px" }} />
                     )}
                   </PieChart>
                 </ResponsiveContainer>
               </div>
               <div className="flex flex-col gap-2 flex-1">
                 {categoryTotals.length === 0 ? (
-                  <div className="flex flex-col gap-1">
-                    <p className="text-sm font-semibold text-on-surface-variant">
-                      Sin gastos aún
-                    </p>
-                    <p className="text-xs text-on-surface-variant opacity-70">
-                      Registra movimientos para ver el análisis
-                    </p>
-                  </div>
+                  <p className="text-sm text-on-surface-variant">Sin gastos aún</p>
                 ) : (
                   categoryTotals.map(({ name, value }, i) => (
-                    <div
-                      key={name}
-                      className="flex items-center justify-between"
-                    >
+                    <div key={name} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
-                          }}
-                        />
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                         <span className="text-sm text-on-surface">{name}</span>
                       </div>
-                      <span className="text-xs font-bold text-on-surface-variant">
-                        {value}%
-                      </span>
+                      <span className="text-xs font-bold text-on-surface-variant">{value}%</span>
                     </div>
                   ))
                 )}
@@ -265,8 +231,56 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* Recent transactions */}
-        <section className="bg-surface rounded-2xl p-5 shadow-card flex flex-col gap-3">
+        {/* Ingresos por Categoría */}
+        <section className="bg-surface rounded-2xl p-5 shadow-card flex flex-col gap-4">
+          <h3 className="text-base font-bold text-on-surface">Ingresos por Categoría</h3>
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 size={24} className="animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-32 shrink-0">
+                <ResponsiveContainer width={128} height={128}>
+                  <PieChart>
+                    <Pie
+                      data={incomeTotals.length > 0 ? incomeTotals : [{ name: "Sin datos", value: 100 }]}
+                      cx="50%" cy="50%"
+                      innerRadius={28} outerRadius={56}
+                      dataKey="value" strokeWidth={0}
+                    >
+                      {(incomeTotals.length > 0 ? incomeTotals : [{}]).map((_, i) => (
+                        <Cell key={i} fill={incomeTotals.length === 0 ? "#dcfce7" : INCOME_COLORS[i % INCOME_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    {incomeTotals.length > 0 && (
+                      <Tooltip formatter={(v, name) => [`${v}%`, name]} contentStyle={{ borderRadius: "0.75rem", border: "none", boxShadow: "0 4px 24px rgb(46 125 50/0.15)", fontSize: "12px" }} />
+                    )}
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                {incomeTotals.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant">Sin ingresos aún</p>
+                ) : (
+                  incomeTotals.map(({ name, value }, i) => (
+                    <div key={name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: INCOME_COLORS[i % INCOME_COLORS.length] }} />
+                        <span className="text-sm text-on-surface">{name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-on-surface-variant">{value}%</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ── Transactions ── */}
+      <section className="bg-surface rounded-2xl p-5 shadow-card flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-bold text-on-surface">
               Transacciones
@@ -345,8 +359,7 @@ export default function Dashboard() {
               })}
             </div>
           )}
-        </section>
-      </div>
+      </section>
     </div>
   );
 }

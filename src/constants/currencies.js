@@ -7,4 +7,5 @@ export const CURRENCIES = [
 
 export const DEFAULT_CURRENCY = "USD";
 
-export const EXCHANGE_RATE_API = "https://api.frankfurter.app/latest";
+// Cambiamos Frankfurter por una API que sí soporta LATAM y CORS
+export const EXCHANGE_RATE_API = "https://open.er-api.com/v6/latest/USD";

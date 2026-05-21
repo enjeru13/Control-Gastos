@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronRight,
   DollarSign,
@@ -168,6 +169,7 @@ function PasswordForm({ onClose }) {
     setSaving(true);
     try {
       await updatePassword(form.next);
+      toast.success("Contraseña actualizada");
       onClose();
     } catch (err) {
       setError(err.message);
@@ -228,11 +230,17 @@ function PasswordForm({ onClose }) {
 // ── Page ─────────────────────────────────────────────────
 
 export default function Settings() {
-  const { profile, user, signOut, updateFullName } = useAuth();
+  const { profile, user, signOut, updateFullName, updateCurrency } = useAuth();
   const navigate = useNavigate();
 
   const [dark, toggleDark] = useDarkMode();
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(profile?.default_currency ?? "USD");
+
+  // Sync once when profile loads (render-phase update — no effect needed)
+  const profileCurrency = profile?.default_currency ?? "USD";
+  if (currency !== profileCurrency && profile?.default_currency) {
+    setCurrency(profileCurrency);
+  }
   const [biometrics, setBiometrics] = useState(false);
   const [alerts, setAlerts] = useState(true);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -267,8 +275,9 @@ export default function Settings() {
     setSavingName(true);
     try {
       await updateFullName(name.trim());
+      toast.success("Nombre actualizado");
     } catch {
-      // rawName auto-reverts when profile reloads — no manual reset needed
+      toast.error("Error al actualizar el nombre");
     } finally {
       setSavingName(false);
     }
@@ -283,9 +292,7 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file) return;
     // TODO: parse CSV → preview → import to Supabase
-    alert(
-      `Archivo seleccionado: ${file.name}\n(Importación se implementará próximamente)`,
-    );
+    toast.info(`Archivo seleccionado: ${file.name} — Importación próximamente`);
     e.target.value = "";
   }
 
@@ -471,7 +478,7 @@ export default function Settings() {
       {showCurrencyPicker && (
         <CurrencyPicker
           current={currency}
-          onSelect={setCurrency}
+          onSelect={(code) => { setCurrency(code); updateCurrency(code); toast.success(`Moneda cambiada a ${code}`); }}
           onClose={() => setShowCurrencyPicker(false)}
         />
       )}
