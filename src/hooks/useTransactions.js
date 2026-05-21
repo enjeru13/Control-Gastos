@@ -1,69 +1,94 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
+import { useEffect, useCallback, useReducer } from "react";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 export function useCategories() {
-  const { user } = useAuth()
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuth();
+  const [state, dispatch] = useReducer(
+    (s, a) => ({ ...s, ...a }),
+    { categories: [], loading: true },
+  );
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
     supabase
-      .from('categories')
-      .select('*')
+      .from("categories")
+      .select("*")
       .or(`user_id.is.null,user_id.eq.${user.id}`)
-      .order('name')
+      .order("name")
       .then(({ data }) => {
-        if (data) setCategories(data)
-        setLoading(false)
-      })
-  }, [user])
+        dispatch({ categories: data ?? [], loading: false });
+      });
+  }, [user]);
 
-  return { categories, loading }
+  return state;
+}
+
+const txInitial = { transactions: [], loading: true, saving: false, error: null };
+
+function txReducer(s, action) {
+  switch (action.type) {
+    case "FETCH_START":  return { ...s, loading: true };
+    case "FETCH_OK":     return { ...s, loading: false, transactions: action.data, error: null };
+    case "FETCH_ERROR":  return { ...s, loading: false, error: action.error };
+    case "SAVE_START":   return { ...s, saving: true, error: null };
+    case "SAVE_OK":      return { ...s, saving: false };
+    case "SAVE_ERROR":   return { ...s, saving: false, error: action.error };
+    default:             return s;
+  }
 }
 
 export function useTransactions() {
-  const { user } = useAuth()
-  const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const { user } = useAuth();
+  const [state, dispatch] = useReducer(txReducer, txInitial);
 
   const fetch = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
+    if (!user) return;
+    dispatch({ type: "FETCH_START" });
     const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        id, type, amount, currency, description, date, notes, created_at,
-        categories ( id, name, icon, color )
-      `)
-      .eq('user_id', user.id)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(100)
+      .from("transactions")
+      .select(
+        `id, type, amount, currency, description, date, notes, created_at,
+         categories ( id, name, icon, color )`,
+      )
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-    if (error) setError(error.message)
-    else setTransactions(data ?? [])
-    setLoading(false)
-  }, [user])
+    dispatch(
+      error
+        ? { type: "FETCH_ERROR", error: error.message }
+        : { type: "FETCH_OK", data: data ?? [] },
+    );
+  }, [user]);
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
 
   async function addTransaction(payload) {
-    if (!user) return
-    setSaving(true)
-    setError(null)
+    if (!user) return false;
+    dispatch({ type: "SAVE_START" });
     const { error } = await supabase
-      .from('transactions')
-      .insert({ ...payload, user_id: user.id })
+      .from("transactions")
+      .insert({ ...payload, user_id: user.id });
 
-    if (error) { setError(error.message); setSaving(false); return false }
-    await fetch()
-    setSaving(false)
-    return true
+    if (error) {
+      dispatch({ type: "SAVE_ERROR", error: error.message });
+      return false;
+    }
+    await fetch();
+    dispatch({ type: "SAVE_OK" });
+    return true;
   }
 
-  return { transactions, loading, saving, error, addTransaction, refetch: fetch }
+  return {
+    transactions: state.transactions,
+    loading:      state.loading,
+    saving:       state.saving,
+    error:        state.error,
+    addTransaction,
+    refetch: fetch,
+  };
 }

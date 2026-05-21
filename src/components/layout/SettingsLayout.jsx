@@ -1,8 +1,8 @@
-import { Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { Outlet, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 export default function SettingsLayout() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -24,5 +24,5 @@ export default function SettingsLayout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }

@@ -1,15 +1,15 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
-import ProtectedRoute from './components/auth/ProtectedRoute'
-import Layout from './components/layout/Layout'
-import SettingsLayout from './components/layout/SettingsLayout'
-import Dashboard from './pages/Dashboard'
-import Transactions from './pages/Transactions'
-import Metas from './pages/Metas'
-import Tools from './pages/Tools'
-import Settings from './pages/Settings'
-import Login from './pages/Login'
-import Register from './pages/Register'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Layout from "./components/layout/Layout";
+import SettingsLayout from "./components/layout/SettingsLayout";
+import Dashboard from "./pages/Dashboard";
+import Transactions from "./pages/Transactions";
+import Metas from "./pages/Metas";
+import Tools from "./pages/Tools";
+import Settings from "./pages/Settings";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 export default function App() {
   return (
@@ -49,5 +49,5 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-  )
+  );
 }

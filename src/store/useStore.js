@@ -1,10 +1,10 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { DEFAULT_CURRENCY } from '../constants/currencies'
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { DEFAULT_CURRENCY } from "../constants/currencies";
 
 export const useStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       /* Auth */
       user: null,
       setUser: (user) => set({ user }),
@@ -20,11 +20,11 @@ export const useStore = create(
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
     }),
     {
-      name: 'finanzas-store',
+      name: "finanzas-store",
       partialize: (state) => ({
         activeCurrency: state.activeCurrency,
         exchangeRates: state.exchangeRates,
       }),
-    }
-  )
-)
+    },
+  ),
+);

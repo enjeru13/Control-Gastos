@@ -1,8 +1,21 @@
 import {
-  UtensilsCrossed, Car, Home, HeartPulse, BookOpen,
-  Tv, ShoppingBag, Zap, User, MoreHorizontal,
-  Briefcase, Laptop, TrendingUp, Gift, PlusCircle, Tag,
-} from 'lucide-react'
+  UtensilsCrossed,
+  Car,
+  Home,
+  HeartPulse,
+  BookOpen,
+  Tv,
+  ShoppingBag,
+  Zap,
+  User,
+  MoreHorizontal,
+  Briefcase,
+  Laptop,
+  TrendingUp,
+  Gift,
+  PlusCircle,
+  Tag,
+} from "lucide-react";
 
 export const ICON_MAP = {
   UtensilsCrossed,
@@ -21,8 +34,8 @@ export const ICON_MAP = {
   Gift,
   PlusCircle,
   Tag,
-}
+};
 
 export function getIcon(name) {
-  return ICON_MAP[name] ?? Tag
+  return ICON_MAP[name] ?? Tag;
 }

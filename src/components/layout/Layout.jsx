@@ -1,45 +1,41 @@
-import { useLocation, useNavigate } from 'react-router-dom'
-import { RefreshCw } from 'lucide-react'
-import { useState, useRef } from 'react'
-import Header from './Header'
-import BottomNav from './BottomNav'
-import PageTransition from './PageTransition'
+import { RefreshCw } from "lucide-react";
+import { useState, useRef } from "react";
+import Header from "./Header";
+import BottomNav from "./BottomNav";
+import PageTransition from "./PageTransition";
 
-const PULL_THRESHOLD = 72
-const PULL_MAX       = 100
+const PULL_THRESHOLD = 72;
+const PULL_MAX = 100;
 
 export default function Layout() {
-  const { pathname } = useLocation()
-  const navigate     = useNavigate()
-
-  const [pullY, setPullY]           = useState(0)
-  const [refreshing, setRefreshing] = useState(false)
-  const touchStartY = useRef(null)
-  const mainRef     = useRef(null)
+  const [pullY, setPullY] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(null);
+  const mainRef = useRef(null);
 
   function onTouchStart(e) {
     if (mainRef.current?.scrollTop === 0) {
-      touchStartY.current = e.touches[0].clientY
+      touchStartY.current = e.touches[0].clientY;
     }
   }
 
   function onTouchMove(e) {
-    if (touchStartY.current === null) return
-    const dy = e.touches[0].clientY - touchStartY.current
+    if (touchStartY.current === null) return;
+    const dy = e.touches[0].clientY - touchStartY.current;
     if (dy > 0 && mainRef.current?.scrollTop === 0) {
-      setPullY(Math.min(dy * 0.45, PULL_MAX))
+      setPullY(Math.min(dy * 0.45, PULL_MAX));
     }
   }
 
   function onTouchEnd() {
     if (pullY >= PULL_THRESHOLD && !refreshing) {
-      setRefreshing(true)
-      setPullY(0)
-      touchStartY.current = null
-      setTimeout(() => window.location.reload(), 600)
+      setRefreshing(true);
+      setPullY(0);
+      touchStartY.current = null;
+      setTimeout(() => window.location.reload(), 600);
     } else {
-      setPullY(0)
-      touchStartY.current = null
+      setPullY(0);
+      touchStartY.current = null;
     }
   }
 
@@ -54,11 +50,11 @@ export default function Layout() {
       >
         <RefreshCw
           size={16}
-          className={refreshing ? 'animate-spin' : ''}
+          className={refreshing ? "animate-spin" : ""}
           style={{
             opacity: Math.min(pullY / PULL_THRESHOLD, 1),
             transform: `rotate(${refreshing ? 0 : pullY * 3}deg)`,
-            transition: 'transform 0.05s linear',
+            transition: "transform 0.05s linear",
           }}
         />
       </div>
@@ -66,7 +62,7 @@ export default function Layout() {
       <main
         ref={mainRef}
         className="flex-1 w-full max-w-3xl mx-auto px-4 py-6"
-        style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom))" }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -76,5 +72,5 @@ export default function Layout() {
 
       <BottomNav />
     </div>
-  )
+  );
 }
