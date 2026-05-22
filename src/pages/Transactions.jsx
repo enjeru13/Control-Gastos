@@ -263,7 +263,7 @@ function EditTransactionSheet({ tx, open, onClose, categories, saving, onSave })
           <input
             {...register("date")}
             type="date"
-            className="w-full min-w-0 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-base text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full min-w-0 appearance-none bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-base text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
           />
         </div>
 

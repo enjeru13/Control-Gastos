@@ -34,10 +34,14 @@ const ratesInitial = { rates: {}, loading: false, lastUpdated: null };
 
 function ratesReducer(state, action) {
   switch (action.type) {
-    case "FETCH_START":  return { ...state, loading: true };
-    case "FETCH_OK":     return { loading: false, rates: action.rates, lastUpdated: action.ts };
-    case "FETCH_FAIL":   return { loading: false, rates: action.fallback, lastUpdated: null };
-    default:             return state;
+    case "FETCH_START":
+      return { ...state, loading: true };
+    case "FETCH_OK":
+      return { loading: false, rates: action.rates, lastUpdated: action.ts };
+    case "FETCH_FAIL":
+      return { loading: false, rates: action.fallback, lastUpdated: null };
+    default:
+      return state;
   }
 }
 
@@ -52,13 +56,21 @@ function useCurrencyRates(base) {
         if (data.result === "success") {
           dispatch({
             type: "FETCH_OK",
-            rates: { USD: data.rates.USD, VES: data.rates.VES, COP: data.rates.COP, EUR: data.rates.EUR },
+            rates: {
+              USD: data.rates.USD,
+              VES: data.rates.VES,
+              COP: data.rates.COP,
+              EUR: data.rates.EUR,
+            },
             ts: new Date(),
           });
         } else throw new Error();
       })
       .catch(() =>
-        dispatch({ type: "FETCH_FAIL", fallback: { USD: 1, COP: 3850, EUR: 0.93, VES: 36.5 } })
+        dispatch({
+          type: "FETCH_FAIL",
+          fallback: { USD: 1, COP: 3850, EUR: 0.93, VES: 36.5 },
+        }),
       );
   }, [base]);
 
@@ -74,7 +86,9 @@ function CurrencyDropdown({ value, onChange, exclude }) {
         className="appearance-none bg-surface text-on-surface font-black text-xl rounded-2xl py-3 pl-5 pr-12 cursor-pointer outline-none shadow-sm border border-outline-variant/30 focus:border-primary focus:ring-4 focus:ring-primary/15 hover:border-primary/50 hover:shadow-md transition-all z-10 relative"
       >
         {CURRENCIES.filter((c) => c !== exclude).map((c) => (
-          <option key={c} value={c}>{c}</option>
+          <option key={c} value={c}>
+            {c}
+          </option>
         ))}
       </select>
       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-outline-variant group-hover:text-primary transition-colors z-20">
@@ -90,12 +104,17 @@ function CurrencyCalculator() {
   const [to, setTo] = useState("COP");
   const { rates, loading, lastUpdated } = useCurrencyRates(from);
 
-  const result = rates[to] ? (parseFloat(amount || 0) * rates[to]).toFixed(2) : "—";
+  const result = rates[to]
+    ? (parseFloat(amount || 0) * rates[to]).toFixed(2)
+    : "—";
   const rateLabel = rates[to]
     ? `1 ${from} = ${new Intl.NumberFormat("es-VE", { maximumFractionDigits: 4 }).format(rates[to])} ${to}`
     : "...";
 
-  function swap() { setFrom(to); setTo(from); }
+  function swap() {
+    setFrom(to);
+    setTo(from);
+  }
 
   return (
     <section className="flex flex-col gap-5">
@@ -105,7 +124,9 @@ function CurrencyCalculator() {
             <TrendingUp size={22} strokeWidth={2.5} />
           </div>
           <div>
-            <h2 className="text-xl font-black text-on-surface tracking-tight">Conversor</h2>
+            <h2 className="text-xl font-black text-on-surface tracking-tight">
+              Conversor
+            </h2>
             <p className="text-[11px] font-bold text-outline uppercase tracking-widest mt-0.5">
               Tasas en tiempo real
             </p>
@@ -113,10 +134,7 @@ function CurrencyCalculator() {
         </div>
       </div>
 
-      <div className="relative w-full rounded-[2.5rem] bg-surface shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-outline-variant/30 p-2 sm:p-3 overflow-hidden">
-        <div className="absolute -top-8 -right-8 w-40 h-40 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-secondary/8 rounded-full blur-2xl pointer-events-none" />
-
+      <div className="relative w-full rounded-[2.5rem] p-2 sm:p-3 overflow-hidden">
         <div className="relative flex flex-col gap-2 z-10">
           {/* ENVIAS */}
           <div className="group bg-surface-container-highest/20 backdrop-blur-xl border border-outline-variant/30 rounded-4xl p-5 pt-6 pb-9 transition-all duration-300 focus-within:bg-surface focus-within:border-outline focus-within:shadow-xl">
@@ -143,7 +161,11 @@ function CurrencyCalculator() {
                 onClick={swap}
                 className="group w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 active:scale-90 transition-all duration-300 shadow-[0_0_20px_rgba(99,102,241,0.4)]"
               >
-                <ArrowLeftRight size={24} strokeWidth={2.5} className="rotate-90 group-hover:rotate-[270deg] transition-transform duration-500" />
+                <ArrowLeftRight
+                  size={24}
+                  strokeWidth={2.5}
+                  className="rotate-90 group-hover:rotate-270 transition-transform duration-500"
+                />
               </button>
             </div>
           </div>
@@ -181,7 +203,11 @@ function CurrencyCalculator() {
       {lastUpdated && (
         <div className="flex justify-center mt-1">
           <span className="text-[10px] font-semibold text-outline-variant/80 uppercase tracking-widest">
-            Actualizado · {lastUpdated.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
+            Actualizado ·{" "}
+            {lastUpdated.toLocaleTimeString("es", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </span>
         </div>
       )}
@@ -230,20 +256,29 @@ function FinancialCalendar({ transactions, loading }) {
   const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
 
   function prevMonth() {
-    if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
-    else setViewMonth((m) => m - 1);
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else setViewMonth((m) => m - 1);
   }
   function nextMonth() {
-    if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); }
-    else setViewMonth((m) => m + 1);
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else setViewMonth((m) => m + 1);
   }
 
-  const monthLabel = new Intl.DateTimeFormat("es", { month: "long", year: "numeric" })
-    .format(new Date(viewYear, viewMonth));
+  const monthLabel = new Intl.DateTimeFormat("es", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(viewYear, viewMonth));
 
   const selectedLabel = selected
-    ? new Intl.DateTimeFormat("es", { weekday: "long", day: "numeric", month: "long" })
-        .format(new Date(selected + "T00:00:00"))
+    ? new Intl.DateTimeFormat("es", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }).format(new Date(selected + "T00:00:00"))
     : "";
 
   // Day summary totals (only when all day txs share same currency)
@@ -252,8 +287,12 @@ function FinancialCalendar({ transactions, loading }) {
     const currencies = [...new Set(dayTxs.map((t) => t.currency))];
     if (currencies.length !== 1) return null;
     const cur = currencies[0];
-    const income = dayTxs.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
-    const expense = dayTxs.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
+    const income = dayTxs
+      .filter((t) => t.type === "income")
+      .reduce((s, t) => s + Number(t.amount), 0);
+    const expense = dayTxs
+      .filter((t) => t.type === "expense")
+      .reduce((s, t) => s + Number(t.amount), 0);
     return { income, expense, cur };
   }, [dayTxs]);
 
@@ -266,7 +305,9 @@ function FinancialCalendar({ transactions, loading }) {
             <CalendarDays size={22} strokeWidth={2.5} />
           </div>
           <div>
-            <h2 className="text-xl font-black text-on-surface tracking-tight">Calendario</h2>
+            <h2 className="text-xl font-black text-on-surface tracking-tight">
+              Calendario
+            </h2>
             <p className="text-[11px] font-bold text-outline uppercase tracking-widest mt-0.5">
               Historial financiero
             </p>
@@ -276,7 +317,6 @@ function FinancialCalendar({ transactions, loading }) {
 
       {/* Calendar card */}
       <div className="bg-surface rounded-3xl shadow-card border border-outline-variant/20 overflow-hidden">
-
         {/* Month nav */}
         <div className="flex justify-between items-center px-5 py-4 border-b border-surface-container">
           <button
@@ -286,7 +326,9 @@ function FinancialCalendar({ transactions, loading }) {
             <ChevronLeft size={18} />
           </button>
           <div className="flex flex-col items-center gap-1">
-            <h3 className="text-sm font-bold text-on-surface capitalize">{monthLabel}</h3>
+            <h3 className="text-sm font-bold text-on-surface capitalize">
+              {monthLabel}
+            </h3>
             {monthCount > 0 && (
               <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                 {monthCount} movimiento{monthCount !== 1 ? "s" : ""}
@@ -305,12 +347,17 @@ function FinancialCalendar({ transactions, loading }) {
         <div className="px-3 pt-3 pb-2">
           <div className="grid grid-cols-7 text-center mb-1">
             {DAYS.map((d) => (
-              <div key={d} className="text-[10px] font-bold text-outline py-1">{d}</div>
+              <div key={d} className="text-[10px] font-bold text-outline py-1">
+                {d}
+              </div>
             ))}
 
             {/* Prev month overflow */}
             {Array.from({ length: startOffset }).map((_, i) => (
-              <div key={`prev-${i}`} className="flex flex-col items-center py-1.5">
+              <div
+                key={`prev-${i}`}
+                className="flex flex-col items-center py-1.5"
+              >
                 <span className="text-xs text-outline-variant/30 w-9 h-9 flex items-center justify-center">
                   {prevMonthDays - startOffset + 1 + i}
                 </span>
@@ -349,8 +396,12 @@ function FinancialCalendar({ transactions, loading }) {
                     {day}
                   </span>
                   <div className="flex gap-0.5 h-1.5">
-                    {hasIncome && <div className="w-1 h-1 rounded-full bg-primary" />}
-                    {hasExpense && <div className="w-1 h-1 rounded-full bg-error" />}
+                    {hasIncome && (
+                      <div className="w-1 h-1 rounded-full bg-primary" />
+                    )}
+                    {hasExpense && (
+                      <div className="w-1 h-1 rounded-full bg-error" />
+                    )}
                   </div>
                 </div>
               );
@@ -385,8 +436,12 @@ function FinancialCalendar({ transactions, loading }) {
               <div className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">
                 <CalendarDays size={18} className="text-on-surface-variant" />
               </div>
-              <p className="text-sm font-semibold text-on-surface-variant">Sin movimientos</p>
-              <p className="text-xs text-outline">Este día no tiene registros</p>
+              <p className="text-sm font-semibold text-on-surface-variant">
+                Sin movimientos
+              </p>
+              <p className="text-xs text-outline">
+                Este día no tiene registros
+              </p>
             </div>
           ) : (
             <div className="bg-surface rounded-2xl shadow-card border border-surface-container overflow-hidden">
@@ -397,7 +452,9 @@ function FinancialCalendar({ transactions, loading }) {
                     <div className="flex-1 bg-primary/8 rounded-xl px-3 py-2 flex items-center gap-2">
                       <ArrowDown size={12} className="text-primary shrink-0" />
                       <div>
-                        <p className="text-[9px] font-bold text-primary/60 uppercase tracking-wider">Ingresos</p>
+                        <p className="text-[9px] font-bold text-primary/60 uppercase tracking-wider">
+                          Ingresos
+                        </p>
                         <p className="text-xs font-black text-primary font-currency">
                           +{fmtAmt(daySummary.income)} {daySummary.cur}
                         </p>
@@ -408,7 +465,9 @@ function FinancialCalendar({ transactions, loading }) {
                     <div className="flex-1 bg-error/8 rounded-xl px-3 py-2 flex items-center gap-2">
                       <ArrowUp size={12} className="text-error shrink-0" />
                       <div>
-                        <p className="text-[9px] font-bold text-error/60 uppercase tracking-wider">Gastos</p>
+                        <p className="text-[9px] font-bold text-error/60 uppercase tracking-wider">
+                          Gastos
+                        </p>
                         <p className="text-xs font-black text-error font-currency">
                           -{fmtAmt(daySummary.expense)} {daySummary.cur}
                         </p>
@@ -425,7 +484,9 @@ function FinancialCalendar({ transactions, loading }) {
                 const color = cat?.color ?? "#6b7280";
                 return (
                   <div key={tx.id}>
-                    {idx > 0 && <div className="h-px bg-surface-container mx-4" />}
+                    {idx > 0 && (
+                      <div className="h-px bg-surface-container mx-4" />
+                    )}
                     <div className="flex items-center justify-between p-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div
@@ -450,7 +511,9 @@ function FinancialCalendar({ transactions, loading }) {
                         ].join(" ")}
                       >
                         {tx.type === "income" ? "+" : "-"}
-                        {new Intl.NumberFormat("es-VE", { minimumFractionDigits: 2 }).format(tx.amount)}{" "}
+                        {new Intl.NumberFormat("es-VE", {
+                          minimumFractionDigits: 2,
+                        }).format(tx.amount)}{" "}
                         {tx.currency}
                       </span>
                     </div>
