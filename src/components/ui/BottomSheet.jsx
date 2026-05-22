@@ -15,7 +15,6 @@ export default function BottomSheet({ open, title, onClose, children }) {
       <div
         // pointer-events-none aquí permite que el clic en el fondo oscuro cierre el modal
         className="fixed inset-0 flex items-end justify-center pointer-events-none"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <DialogPanel
           transition

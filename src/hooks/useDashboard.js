@@ -6,6 +6,7 @@ const initial = {
   recentTransactions: [],
   categoryTotals: [],
   incomeTotals: [],
+  balances: { USD: 0, VES: 0, COP: 0 },
   totalDebt: 0,
   totalDebtPaid: 0,
   totalSavings: 0,
@@ -92,12 +93,23 @@ export function useDashboard() {
         value: incomeTotalCount > 0 ? Math.round((count / incomeTotalCount) * 100) : 0,
       }));
 
+    // Net balance per currency (income - expense, all time)
+    const balances = { USD: 0, VES: 0, COP: 0 };
+    for (const tx of transactions) {
+      const cur = tx.currency;
+      if (!(cur in balances)) balances[cur] = 0;
+      balances[cur] += tx.type === "income"
+        ? Number(tx.amount)
+        : -Number(tx.amount);
+    }
+
     dispatch({
       type: "LOAD_OK",
       payload: {
         recentTransactions: transactions.slice(0, 5),
         categoryTotals,
         incomeTotals,
+        balances,
         totalDebt:     debts.reduce((s, d) => s + (Number(d.total_amount) - Number(d.paid_amount)), 0),
         totalDebtPaid: debts.reduce((s, d) => s + Number(d.paid_amount), 0),
         totalSavings:  goals.reduce((s, g) => s + Number(g.current_amount), 0),

@@ -5,7 +5,14 @@ export default function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    onRegistered(registration) {
+      // Check for new SW every 60 s — catches deployments while app is open
+      if (registration) {
+        setInterval(() => registration.update(), 60_000);
+      }
+    },
+  });
 
   if (!needRefresh) return null;
 

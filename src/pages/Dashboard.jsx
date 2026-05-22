@@ -15,11 +15,11 @@ import { getIcon } from "../lib/categoryIcons";
 const PIE_COLORS = ["#4f46e5", "#818cf8", "#a5b4fc", "#6366f1", "#c7d2fe"];
 const INCOME_COLORS = ["#2e7d32", "#4caf50", "#81c784", "#388e3c", "#a5d6a7"];
 
-const CURRENCY_BALANCES = [
-  { code: "VES", display: "Bs. —", flag: "🇻🇪" },
-  { code: "COP", display: "$ —", flag: "🇨🇴" },
-  { code: "USD", display: "$ —", flag: "🇺🇸" },
-];
+const CURRENCY_META = {
+  VES: { flag: "🇻🇪", symbol: "Bs." },
+  COP: { flag: "🇨🇴", symbol: "$" },
+  USD: { flag: "🇺🇸", symbol: "$" },
+};
 
 function fmtAmt(amount) {
   return new Intl.NumberFormat("es-VE", {
@@ -43,6 +43,7 @@ export default function Dashboard() {
     recentTransactions,
     categoryTotals,
     incomeTotals,
+    balances,
     totalDebt,
     totalDebtPaid,
     totalSavings,
@@ -73,35 +74,44 @@ export default function Dashboard() {
             </div>
 
             <h2 className="text-4xl sm:text-5xl font-black font-currency tracking-tighter mt-2 mb-1 drop-shadow-sm">
-              $ —
+              {loading ? "—" : `$ ${fmtAmt(balances.USD)}`}
             </h2>
 
             <span className="text-xs font-medium opacity-80 bg-black/10 w-fit px-3 py-1.5 rounded-full backdrop-blur-md mt-2 border border-white/10">
-              Conecta tus cuentas para ver tu balance
+              {loading
+                ? "Cargando..."
+                : balances.USD === 0 && balances.VES === 0 && balances.COP === 0
+                  ? "Sin movimientos registrados"
+                  : "Balance neto acumulado en USD"}
             </span>
           </div>
         </div>
 
-        {/* Tarjetas de monedas (Estilo Neumórfico suave) */}
+        {/* Tarjetas de monedas */}
         <div className="grid grid-cols-3 gap-3">
-          {CURRENCY_BALANCES.map(({ code, display, flag }) => (
-            <div
-              key={code}
-              className="bg-surface/80 backdrop-blur-md rounded-[1.25rem] p-3.5 shadow-sm border border-outline-variant/40 flex flex-col gap-2 hover:shadow-md transition-shadow"
-            >
-              <div className="flex justify-between items-center text-on-surface-variant">
-                <div className="flex items-center gap-1.5">
+          {Object.entries(CURRENCY_META).map(([code, { flag, symbol }]) => {
+            const net = balances[code] ?? 0;
+            const isNeg = net < 0;
+            return (
+              <div
+                key={code}
+                className="bg-surface/80 backdrop-blur-md rounded-[1.25rem] p-3.5 shadow-sm border border-outline-variant/40 flex flex-col gap-2 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-1.5 text-on-surface-variant">
                   <span className="text-xs">{flag}</span>
-                  <span className="text-[10px] font-bold tracking-widest uppercase">
-                    {code}
-                  </span>
+                  <span className="text-[10px] font-bold tracking-widest uppercase">{code}</span>
                 </div>
+                <p className={[
+                  "text-sm font-black font-currency leading-tight truncate",
+                  loading ? "text-on-surface-variant" : isNeg ? "text-error" : "text-on-surface",
+                ].join(" ")}>
+                  {loading
+                    ? "—"
+                    : `${isNeg ? "-" : ""}${symbol} ${fmtAmt(Math.abs(net))}`}
+                </p>
               </div>
-              <p className="text-sm font-black font-currency text-on-surface leading-tight truncate">
-                {display}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

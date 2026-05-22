@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Menu, MenuButton, MenuItems, MenuItem } from "@headlessui/react";
 import {
@@ -20,8 +20,13 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
+  CheckCircle2,
+  History,
+  Sparkles,
 } from "lucide-react";
 import { useSavingsGoals, useDebts, useWishlist } from "../hooks/useMetas";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 import BottomSheet from "../components/ui/BottomSheet";
 
 // ── Constants ──────────────────────────────────────────────
@@ -79,6 +84,45 @@ function fmtAmt(amount, currency = "USD") {
   }).format(amount);
 }
 
+// Normalize input: strips thousands separators, handles comma-as-decimal
+function parseAmt(raw) {
+  const s = String(raw).trim().replace(/\s/g, "");
+  if (!s) return NaN;
+  // Both dot and comma present → whichever is last is decimal separator
+  const hasDot   = s.includes(".");
+  const hasComma = s.includes(",");
+  if (hasDot && hasComma) {
+    return s.lastIndexOf(".") > s.lastIndexOf(",")
+      ? Number(s.replace(/,/g, ""))               // 1,000.50
+      : Number(s.replace(/\./g, "").replace(",", ".")); // 1.000,50
+  }
+  if (hasComma) {
+    const parts = s.split(",");
+    // Treat as decimal only when exactly one comma with ≤2 digits after
+    return parts.length === 2 && parts[1].length <= 2
+      ? Number(s.replace(",", "."))
+      : Number(s.replace(/,/g, ""));
+  }
+  if (hasDot) {
+    const parts = s.split(".");
+    // Multiple dots → thousands separators
+    return parts.length > 2 ? Number(s.replace(/\./g, "")) : Number(s);
+  }
+  return Number(s);
+}
+
+const roundAmt = (n) => Math.round(Number(n) * 100) / 100;
+
+function AmountPreview({ value, currency = "USD" }) {
+  const n = parseAmt(value);
+  if (!value || isNaN(n) || n <= 0) return null;
+  return (
+    <p className="text-xs font-semibold text-primary -mt-1">
+      = {fmtAmt(n, currency)}
+    </p>
+  );
+}
+
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   return Math.ceil((new Date(dateStr) - new Date()) / 86400000);
@@ -97,7 +141,7 @@ function Field({ label, error, children }) {
 }
 
 function InputCls(hasErr) {
-  return `w-full bg-surface-container-low border rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all ${
+  return `w-full min-w-0 bg-surface-container-low border rounded-xl px-4 py-3 text-base text-on-surface outline-none transition-all ${
     hasErr
       ? "border-error focus:ring-2 focus:ring-error/20"
       : "border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/10"
@@ -113,16 +157,17 @@ function AportarSheet({ open, goal, onClose, onSave }) {
 
   async function handle(e) {
     e.preventDefault();
-    if (!amount || +amount <= 0) {
+    const parsed = parseAmt(amount);
+    if (!amount || isNaN(parsed) || parsed <= 0) {
       setError("Monto inválido");
       return;
     }
     setSaving(true);
     try {
-      const newAmount = Math.min(
-        Number(goal.current_amount) + Number(amount),
-        Number(goal.target_amount),
-      );
+      const newAmount = roundAmt(Math.min(
+        roundAmt(Number(goal.current_amount)) + roundAmt(parsed),
+        roundAmt(Number(goal.target_amount)),
+      ));
       await onSave(goal.id, { current_amount: newAmount });
       toast.success("Aporte registrado");
       setAmount("");
@@ -141,36 +186,53 @@ function AportarSheet({ open, goal, onClose, onSave }) {
       onClose={onClose}
     >
       <form onSubmit={handle} className="flex flex-col gap-5">
-        {goal && (
-          <div className="bg-primary-container/30 rounded-2xl p-4 flex justify-between items-center">
-            <div>
-              <p className="text-xs text-on-surface-variant mb-0.5">Ahorrado</p>
-              <p className="text-base font-bold text-on-surface">
-                {fmtAmt(goal.current_amount, goal.currency)}
-              </p>
+        {goal && (() => {
+          const remaining = roundAmt(Number(goal.target_amount) - Number(goal.current_amount));
+          const pct = goal.target_amount > 0
+            ? Math.min(Math.round((Number(goal.current_amount) / Number(goal.target_amount)) * 100), 100)
+            : 0;
+          return (
+            <div className="bg-primary-container/30 rounded-2xl p-4 flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-on-surface-variant mb-0.5">Ahorrado</p>
+                  <p className="text-base font-bold text-on-surface">
+                    {fmtAmt(goal.current_amount, goal.currency)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-on-surface-variant mb-0.5">Restante</p>
+                  <p className="text-base font-bold text-error">
+                    {fmtAmt(remaining, goal.currency)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-on-surface-variant mb-0.5">Objetivo</p>
+                  <p className="text-base font-bold text-primary">
+                    {fmtAmt(goal.target_amount, goal.currency)}
+                  </p>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-primary/15 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-linear-to-r from-tertiary-fixed-dim to-primary transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-on-surface-variant mb-0.5">Objetivo</p>
-              <p className="text-base font-bold text-primary">
-                {fmtAmt(goal.target_amount, goal.currency)}
-              </p>
-            </div>
-          </div>
-        )}
+          );
+        })()}
         <Field label="Monto a aportar" error={error}>
           <input
-            type="number"
-            step="0.01"
-            min="0.01"
+            type="text"
+            inputMode="decimal"
             value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setError("");
-            }}
+            onChange={(e) => { setAmount(e.target.value); setError(""); }}
             placeholder="0.00"
             className={InputCls(!!error)}
             autoFocus
           />
+          <AmountPreview value={amount} currency={goal?.currency} />
         </Field>
         <button
           type="submit"
@@ -193,26 +255,38 @@ function AportarSheet({ open, goal, onClose, onSave }) {
 
 // ── Abonar Sheet ───────────────────────────────────────────
 
-function AbonarSheet({ open, debt, onClose, onSave }) {
+function AbonarSheet({ open, debt, onClose, onSave, onPayment }) {
   const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const isSettled = debt
+    ? roundAmt(Number(debt.paid_amount)) >= roundAmt(Number(debt.total_amount))
+    : false;
+
   async function handle(e) {
     e.preventDefault();
-    if (!amount || +amount <= 0) {
+    if (isSettled) return;
+    const parsed = parseAmt(amount);
+    if (!amount || isNaN(parsed) || parsed <= 0) {
       setError("Monto inválido");
       return;
     }
     setSaving(true);
     try {
-      const newPaid = Math.min(
-        Number(debt.paid_amount) + Number(amount),
-        Number(debt.total_amount),
-      );
-      await onSave(debt.id, { paid_amount: newPaid });
+      const newPaid = roundAmt(Math.min(
+        roundAmt(Number(debt.paid_amount)) + roundAmt(parsed),
+        roundAmt(Number(debt.total_amount)),
+      ));
+      const today = new Date().toISOString().slice(0, 10);
+      await Promise.all([
+        onSave(debt.id, { paid_amount: newPaid }),
+        onPayment(debt.id, { amount: roundAmt(parsed), notes, date: today }),
+      ]);
       toast.success("Abono registrado");
       setAmount("");
+      setNotes("");
       onClose();
     } catch (err) {
       setError(err.message);
@@ -227,61 +301,187 @@ function AbonarSheet({ open, debt, onClose, onSave }) {
       title={debt ? `Abonar a "${debt.name}"` : "Abonar"}
       onClose={onClose}
     >
-      <form onSubmit={handle} className="flex flex-col gap-5">
-        {debt && (
-          <div className="bg-error-container/30 rounded-2xl p-4 flex justify-between items-center">
-            <div>
-              <p className="text-xs text-on-surface-variant mb-0.5">
-                Pendiente
-              </p>
-              <p className="text-base font-bold text-error">
-                {fmtAmt(
-                  Number(debt.total_amount) - Number(debt.paid_amount),
-                  debt.currency,
-                )}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-on-surface-variant mb-0.5">Pagado</p>
-              <p className="text-base font-bold text-success">
-                {fmtAmt(debt.paid_amount, debt.currency)}
-              </p>
-            </div>
+      {isSettled ? (
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center">
+            <CheckCircle2 size={32} className="text-success" />
           </div>
-        )}
-        <Field label="Monto a abonar" error={error}>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setError("");
-            }}
-            placeholder="0.00"
-            className={InputCls(!!error)}
-            autoFocus
-          />
-        </Field>
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full py-4 rounded-xl text-on-primary text-sm font-bold shadow-card active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-          style={{
-            background: "linear-gradient(180deg, #ba1a1a 0%, #93000a 100%)",
-          }}
-        >
-          {saving ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            "Registrar Abono"
+          <p className="text-base font-bold text-on-surface">Deuda completamente pagada</p>
+          <p className="text-sm text-on-surface-variant">No hay monto pendiente para abonar.</p>
+        </div>
+      ) : (
+        <form onSubmit={handle} className="flex flex-col gap-5">
+          {debt && (
+            <div className="bg-error-container/30 rounded-2xl p-4 flex justify-between items-center">
+              <div>
+                <p className="text-xs text-on-surface-variant mb-0.5">Pendiente</p>
+                <p className="text-base font-bold text-error">
+                  {fmtAmt(Number(debt.total_amount) - Number(debt.paid_amount), debt.currency)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-on-surface-variant mb-0.5">Pagado</p>
+                <p className="text-base font-bold text-success">
+                  {fmtAmt(debt.paid_amount, debt.currency)}
+                </p>
+              </div>
+            </div>
           )}
-        </button>
-      </form>
+          <Field label="Monto a abonar" error={error}>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => { setAmount(e.target.value); setError(""); }}
+              placeholder="0.00"
+              className={InputCls(!!error)}
+              autoFocus
+            />
+            <AmountPreview value={amount} currency={debt?.currency} />
+          </Field>
+          <Field label="Nota (opcional)">
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ej. Transferencia banco"
+              className={InputCls(false)}
+            />
+          </Field>
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-4 rounded-xl text-on-primary text-sm font-bold shadow-card active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(180deg, #ba1a1a 0%, #93000a 100%)" }}
+          >
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : "Registrar Abono"}
+          </button>
+        </form>
+      )}
+    </BottomSheet>
+  );
+}
+
+// ── Debt History Sheet ─────────────────────────────────────
+
+function DebtHistorySheet({ open, debt, onClose }) {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !debt) return;
+    setLoading(true);
+    supabase
+      .from("debt_payments")
+      .select("*")
+      .eq("debt_id", debt.id)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setPayments(data ?? []);
+        setLoading(false);
+      });
+  }, [open, debt?.id]);
+
+  if (!debt) return null;
+
+  const pct = debt.total_amount > 0
+    ? Math.min(Math.round((Number(debt.paid_amount) / Number(debt.total_amount)) * 100), 100)
+    : 0;
+
+  return (
+    <BottomSheet open={open} title={`Historial · ${debt.name}`} onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        {/* Summary bar */}
+        <div className={`rounded-2xl p-4 flex justify-between items-center ${pct === 100 ? "bg-success/10 border border-success/20" : "bg-error-container/20"}`}>
+          <div>
+            <p className="text-xs text-on-surface-variant mb-0.5">Deuda total</p>
+            <p className="text-base font-bold font-currency text-on-surface">
+              {fmtAmt(debt.total_amount, debt.currency)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-on-surface-variant mb-0.5">Pagado</p>
+            <p className="text-base font-bold font-currency text-success">
+              {fmtAmt(debt.paid_amount, debt.currency)}
+            </p>
+          </div>
+        </div>
+
+        {/* Progress */}
+        <div>
+          <div className="w-full h-2.5 bg-error/10 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-linear-to-r from-error to-success transition-all duration-700"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-1.5">
+            <span className="text-xs text-on-surface-variant">Pendiente {fmtAmt(Number(debt.total_amount) - Number(debt.paid_amount), debt.currency)}</span>
+            <span className={`text-xs font-bold ${pct === 100 ? "text-success" : "text-on-surface-variant"}`}>{pct}%</span>
+          </div>
+        </div>
+
+        {/* Payment list */}
+        <div className="flex flex-col gap-1">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 size={20} className="animate-spin text-primary" />
+            </div>
+          ) : (() => {
+            const trackedSum = payments.reduce((s, p) => s + Number(p.amount), 0);
+            const legacy = roundAmt(Number(debt.paid_amount) - roundAmt(trackedSum));
+            const hasLegacy = legacy > 0.009; // > 1 centavo de diferencia
+
+            if (payments.length === 0 && !hasLegacy) {
+              return (
+                <div className="flex flex-col items-center py-8 gap-2 text-center">
+                  <History size={28} className="text-outline-variant" />
+                  <p className="text-sm font-semibold text-on-surface-variant">Sin pagos aún</p>
+                  <p className="text-xs text-outline">Los abonos aparecerán aquí</p>
+                </div>
+              );
+            }
+
+            return (
+              <>
+                <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-1 mb-1">
+                  {payments.length + (hasLegacy ? 1 : 0)} pago{(payments.length + (hasLegacy ? 1 : 0)) !== 1 ? "s" : ""}
+                </p>
+
+                {/* Tracked payments */}
+                {payments.map((p, i) => (
+                  <div key={p.id ?? i} className="flex items-center justify-between p-3.5 bg-surface-container-low rounded-xl">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs font-semibold text-on-surface-variant">
+                        {new Intl.DateTimeFormat("es", { day: "numeric", month: "long", year: "numeric" })
+                          .format(new Date(p.date + "T00:00:00"))}
+                      </p>
+                      {p.notes && <p className="text-[11px] text-outline">{p.notes}</p>}
+                    </div>
+                    <p className="text-sm font-bold text-success font-currency">
+                      +{fmtAmt(p.amount, debt.currency)}
+                    </p>
+                  </div>
+                ))}
+
+                {/* Legacy lump sum — payments made before history tracking */}
+                {hasLegacy && (
+                  <div className="flex items-center justify-between p-3.5 bg-surface-container-low rounded-xl border border-dashed border-outline-variant/40">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs font-semibold text-on-surface-variant">Pagos anteriores al historial</p>
+                      <p className="text-[11px] text-outline">Registrados antes de activar el seguimiento</p>
+                    </div>
+                    <p className="text-sm font-bold text-success font-currency">
+                      +{fmtAmt(legacy, debt.currency)}
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      </div>
     </BottomSheet>
   );
 }
@@ -320,7 +520,8 @@ function AddGoalSheet({ open, onClose, onSave, defaultValues = null }) {
     e.preventDefault();
     const errs = {};
     if (!form.name.trim()) errs.name = "Requerido";
-    if (!form.target_amount || +form.target_amount <= 0)
+    const parsedTarget = parseAmt(form.target_amount);
+    if (!form.target_amount || isNaN(parsedTarget) || parsedTarget <= 0)
       errs.target_amount = "Monto inválido";
     if (Object.keys(errs).length) {
       setErrors(errs);
@@ -330,7 +531,7 @@ function AddGoalSheet({ open, onClose, onSave, defaultValues = null }) {
     try {
       await onSave({
         name: form.name.trim(),
-        target_amount: +form.target_amount,
+        target_amount: roundAmt(parsedTarget),
         current_amount: 0,
         currency: form.currency,
         target_date: form.target_date || null,
@@ -376,14 +577,14 @@ function AddGoalSheet({ open, onClose, onSave, defaultValues = null }) {
         </Field>
         <Field label="Monto objetivo" error={errors.target_amount}>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
             value={form.target_amount}
             onChange={(e) => set("target_amount", e.target.value)}
             placeholder="0.00"
             className={InputCls(errors.target_amount)}
           />
+          <AmountPreview value={form.target_amount} currency={form.currency} />
         </Field>
         <Field label="Moneda">
           <div className="flex gap-2">
@@ -455,9 +656,11 @@ function AddDebtSheet({ open, onClose, onSave }) {
     e.preventDefault();
     const errs = {};
     if (!form.name.trim()) errs.name = "Requerido";
-    if (!form.total_amount || +form.total_amount <= 0)
+    const parsedTotal = parseAmt(form.total_amount);
+    const parsedPaid  = parseAmt(form.paid_amount || "0");
+    if (!form.total_amount || isNaN(parsedTotal) || parsedTotal <= 0)
       errs.total_amount = "Monto inválido";
-    if (+form.paid_amount < 0) errs.paid_amount = "No puede ser negativo";
+    if (isNaN(parsedPaid) || parsedPaid < 0) errs.paid_amount = "No puede ser negativo";
     if (Object.keys(errs).length) {
       setErrors(errs);
       return;
@@ -467,8 +670,8 @@ function AddDebtSheet({ open, onClose, onSave }) {
       await onSave({
         name: form.name.trim(),
         type: form.type,
-        total_amount: +form.total_amount,
-        paid_amount: +form.paid_amount || 0,
+        total_amount: roundAmt(parsedTotal),
+        paid_amount: roundAmt(parsedPaid),
         currency: form.currency,
         interest_rate: form.interest_rate ? +form.interest_rate : null,
         due_date: form.due_date || null,
@@ -524,28 +727,28 @@ function AddDebtSheet({ open, onClose, onSave }) {
             )}
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 overflow-hidden">
           <Field label="Monto total" error={errors.total_amount}>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={form.total_amount}
               onChange={(e) => set("total_amount", e.target.value)}
               placeholder="0.00"
               className={InputCls(errors.total_amount)}
             />
+            <AmountPreview value={form.total_amount} currency={form.currency} />
           </Field>
           <Field label="Ya pagado" error={errors.paid_amount}>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={form.paid_amount}
               onChange={(e) => set("paid_amount", e.target.value)}
               placeholder="0.00"
               className={InputCls(errors.paid_amount)}
             />
+            <AmountPreview value={form.paid_amount} currency={form.currency} />
           </Field>
         </div>
         <Field label="Moneda">
@@ -562,7 +765,7 @@ function AddDebtSheet({ open, onClose, onSave }) {
             ))}
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 overflow-hidden">
           <Field label="Interés anual % (opcional)">
             <input
               type="number"
@@ -638,7 +841,7 @@ function AddWishlistSheet({ open, onClose, onSave }) {
     try {
       await onSave({
         name: form.name.trim(),
-        price: form.price ? +form.price : null,
+        price: form.price ? roundAmt(parseAmt(form.price)) : null,
         currency: form.currency,
         priority: form.priority,
         description: form.description || null,
@@ -699,14 +902,14 @@ function AddWishlistSheet({ open, onClose, onSave }) {
         </Field>
         <Field label="Precio estimado (opcional)">
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
             value={form.price}
             onChange={(e) => set("price", e.target.value)}
             placeholder="0.00"
             className={InputCls(false)}
           />
+          <AmountPreview value={form.price} currency={form.currency} />
         </Field>
         <Field label="Moneda">
           <div className="flex gap-2">
@@ -755,29 +958,48 @@ function AddWishlistSheet({ open, onClose, onSave }) {
 
 // ── Card components ────────────────────────────────────────
 
-function GoalCard({ goal, onDelete, onAportar }) {
+function GoalCard({ goal, onDelete, onAportar, userName = "tú" }) {
   const pct =
     goal.target_amount > 0
       ? Math.min(
-          Math.round((goal.current_amount / goal.target_amount) * 100),
+          Math.round((Number(goal.current_amount) / Number(goal.target_amount)) * 100),
           100,
         )
       : 0;
-  const iconMeta =
-    GOAL_ICONS.find((g) => g.name === goal.icon) ?? GOAL_ICONS[6];
+  const isCompleted = pct >= 100;
+  const iconMeta = GOAL_ICONS.find((g) => g.name === goal.icon) ?? GOAL_ICONS[6];
   const { Icon, bg: bgColor, color: iconColor } = iconMeta;
+
   return (
-    <div className="bg-surface rounded-2xl p-5 shadow-card border border-surface-container hover:shadow-overlay transition-shadow duration-300 flex flex-col gap-4 relative">
-      <div className="flex justify-between items-start">
+    <div className={`rounded-2xl p-5 shadow-card border hover:shadow-overlay transition-all duration-300 flex flex-col gap-4 relative overflow-hidden ${
+      isCompleted
+        ? "bg-linear-to-br from-success/10 to-success/5 border-success/25"
+        : "bg-surface border-surface-container"
+    }`}>
+      {/* Completed glow */}
+      {isCompleted && (
+        <div className="absolute -top-6 -right-6 w-24 h-24 bg-success/20 rounded-full blur-2xl pointer-events-none" />
+      )}
+
+      <div className="flex justify-between items-start relative">
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-            style={{ backgroundColor: bgColor }}
+            style={{ backgroundColor: isCompleted ? "#22c55e1a" : bgColor }}
           >
-            <Icon size={18} style={{ color: iconColor }} />
+            {isCompleted
+              ? <CheckCircle2 size={18} className="text-success" />
+              : <Icon size={18} style={{ color: iconColor }} />}
           </div>
           <div>
-            <h3 className="text-sm font-bold text-on-surface">{goal.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-on-surface">{goal.name}</h3>
+              {isCompleted && (
+                <span className="text-[10px] font-bold bg-success/15 text-success px-2 py-0.5 rounded-full">
+                  ¡Meta alcanzada!
+                </span>
+              )}
+            </div>
             <p className="text-xs text-on-surface-variant">{goal.currency}</p>
           </div>
         </div>
@@ -789,12 +1011,14 @@ function GoalCard({ goal, onDelete, onAportar }) {
             transition
             className="absolute right-0 top-8 z-10 bg-surface border border-surface-container rounded-xl shadow-overlay overflow-hidden min-w-37.5 origin-top-right transition duration-150 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
           >
-            <MenuItem as="button"
-              onClick={() => onAportar(goal)}
-              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
-            >
-              <TrendingUp size={14} /> Aportar
-            </MenuItem>
+            {!isCompleted && (
+              <MenuItem as="button"
+                onClick={() => onAportar(goal)}
+                className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
+              >
+                <TrendingUp size={14} /> Aportar
+              </MenuItem>
+            )}
             <MenuItem as="button"
               onClick={() => onDelete(goal.id)}
               className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error data-[focus]:bg-error-container/20 transition-colors"
@@ -804,63 +1028,94 @@ function GoalCard({ goal, onDelete, onAportar }) {
           </MenuItems>
         </Menu>
       </div>
-      <div>
-        <div className="flex justify-between items-end mb-2">
-          <span className="text-xl font-bold font-currency text-on-surface">
-            {fmtAmt(goal.current_amount, goal.currency)}
-          </span>
-          <span className="text-xs text-on-surface-variant">
-            de {fmtAmt(goal.target_amount, goal.currency)}
-          </span>
+
+      {isCompleted ? (
+        /* Completed state body */
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <span className="text-xl font-bold font-currency text-success">
+              {fmtAmt(goal.current_amount, goal.currency)}
+            </span>
+            <span className="text-xs text-success/70 font-semibold">
+              Objetivo: {fmtAmt(goal.target_amount, goal.currency)}
+            </span>
+          </div>
+          <div className="w-full h-3 bg-success/15 rounded-full overflow-hidden">
+            <div className="h-full w-full rounded-full bg-linear-to-r from-success/70 to-success" />
+          </div>
+          <div className="flex items-center justify-center gap-1.5">
+            <Sparkles size={12} className="text-success" />
+            <p className="text-xs font-semibold text-success/80">
+              ¡{userName}, lograste esta meta!
+            </p>
+          </div>
         </div>
-        <div className="w-full h-3 bg-primary/10 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-linear-to-r from-tertiary-fixed-dim to-primary transition-all duration-700"
-            style={{ width: `${pct}%` }}
-          />
+      ) : (
+        /* Normal progress body */
+        <div>
+          <div className="flex justify-between items-end mb-2">
+            <span className="text-xl font-bold font-currency text-on-surface">
+              {fmtAmt(goal.current_amount, goal.currency)}
+            </span>
+            <span className="text-xs text-on-surface-variant">
+              de {fmtAmt(goal.target_amount, goal.currency)}
+            </span>
+          </div>
+          <div className="w-full h-3 bg-primary/10 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-linear-to-r from-tertiary-fixed-dim to-primary transition-all duration-700"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <div className="mt-1.5 text-right">
+            <span className="text-xs font-bold text-primary">{pct}%</span>
+          </div>
         </div>
-        <div className="mt-1.5 text-right">
-          <span className="text-xs font-bold text-primary">{pct}%</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-function DebtCard({ debt, onDelete, onAbonar }) {
+function DebtCard({ debt, onDelete, onAbonar, onHistory }) {
   const meta = DEBT_TYPE_META[debt.type] ?? DEBT_TYPE_META.other;
   const { Icon, color, label } = meta;
-  const remaining = debt.total_amount - debt.paid_amount;
+  const remaining = Number(debt.total_amount) - Number(debt.paid_amount);
   const pct =
     debt.total_amount > 0
-      ? Math.min(Math.round((debt.paid_amount / debt.total_amount) * 100), 100)
+      ? Math.min(Math.round((Number(debt.paid_amount) / Number(debt.total_amount)) * 100), 100)
       : 0;
+  const isSettled = pct >= 100;
   const days = daysUntil(debt.due_date);
-  const urgent = days !== null && days <= 30;
+  const urgent = days !== null && days <= 30 && !isSettled;
   return (
-    <div className="bg-surface rounded-2xl shadow-card border border-surface-container overflow-hidden hover:shadow-overlay transition-shadow duration-300">
+    <div className={`bg-surface rounded-2xl shadow-card border overflow-hidden hover:shadow-overlay transition-shadow duration-300 ${isSettled ? "border-success/20" : "border-surface-container"}`}>
       <div className="flex">
         <div
           className="w-1 shrink-0 rounded-l-2xl"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: isSettled ? "#22c55e" : color }}
         />
         <div className="flex-1 p-5 flex flex-col gap-4">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3">
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: color + "1a" }}
+                style={{ backgroundColor: isSettled ? "#22c55e1a" : color + "1a" }}
               >
-                <Icon size={18} style={{ color }} />
+                {isSettled
+                  ? <CheckCircle2 size={18} className="text-success" />
+                  : <Icon size={18} style={{ color }} />}
               </div>
               <div>
-                <h3 className="text-sm font-bold text-on-surface">
-                  {debt.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-on-surface">{debt.name}</h3>
+                  {isSettled && (
+                    <span className="text-[10px] font-bold bg-success/15 text-success px-2 py-0.5 rounded-full">
+                      Pagado
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-on-surface-variant">
-                    {label}
-                  </span>
+                  <span className="text-xs text-on-surface-variant">{label}</span>
                   {debt.interest_rate && (
                     <span className="text-[10px] font-bold bg-error-container/50 text-on-error-container px-1.5 py-0.5 rounded-full">
                       {debt.interest_rate}% anual
@@ -877,11 +1132,19 @@ function DebtCard({ debt, onDelete, onAbonar }) {
                 transition
                 className="absolute right-0 top-8 z-10 bg-surface border border-surface-container rounded-xl shadow-overlay overflow-hidden min-w-41.25 origin-top-right transition duration-150 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
               >
+                {!isSettled && (
+                  <MenuItem as="button"
+                    onClick={() => onAbonar(debt)}
+                    className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
+                  >
+                    <Receipt size={14} /> Registrar abono
+                  </MenuItem>
+                )}
                 <MenuItem as="button"
-                  onClick={() => onAbonar(debt)}
-                  className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
+                  onClick={() => onHistory(debt)}
+                  className="flex items-center gap-2 w-full px-4 py-3 text-sm text-on-surface data-[focus]:bg-surface-container transition-colors"
                 >
-                  <Receipt size={14} /> Registrar abono
+                  <History size={14} /> Ver historial
                 </MenuItem>
                 <MenuItem as="button"
                   onClick={() => onDelete(debt.id)}
@@ -1012,11 +1275,17 @@ const TABS = [
 // ── Page ───────────────────────────────────────────────────
 
 export default function Metas() {
+  const { profile } = useAuth();
+  const userName = profile?.full_name?.split(" ")[0] ?? "tú";
+
   const [activeTab, setActiveTab] = useState("goals");
+  const [goalFilter, setGoalFilter] = useState("progress"); // 'all' | 'progress' | 'completed'
+  const [debtFilter, setDebtFilter] = useState("active"); // 'all' | 'active' | 'paid'
   const [sheet, setSheet] = useState(null); // 'goal' | 'debt' | 'wishlist'
-  const [aportarGoal, setAportarGoal] = useState(null); // goal object → opens AportarSheet
-  const [abonarDebt, setAbonarDebt] = useState(null); // debt object → opens AbonarSheet
-  const [convertItem, setConvertItem] = useState(null); // wishlist item → pre-fills AddGoalSheet
+  const [aportarGoal, setAportarGoal] = useState(null);
+  const [abonarDebt, setAbonarDebt] = useState(null);
+  const [historyDebt, setHistoryDebt] = useState(null);
+  const [convertItem, setConvertItem] = useState(null);
 
   const {
     goals,
@@ -1031,19 +1300,47 @@ export default function Metas() {
     addDebt,
     updateDebt,
     deleteDebt,
+    addDebtPayment,
   } = useDebts();
   const { items, loading: loadingWish, addItem, deleteItem } = useWishlist();
 
+  // Group totals by currency — avoids fake cross-currency sum
+  function groupAmounts(items, amountFn) {
+    const map = {};
+    for (const item of items) {
+      const cur = item.currency ?? "USD";
+      map[cur] = (map[cur] ?? 0) + amountFn(item);
+    }
+    return Object.entries(map).filter(([, v]) => v > 0);
+  }
+
+  const savingsByCur   = groupAmounts(goals, (g) => Number(g.current_amount));
+  const debtRemByCur   = groupAmounts(debts, (d) => Number(d.total_amount) - Number(d.paid_amount));
+  const debtPaidByCur  = groupAmounts(debts, (d) => Number(d.paid_amount));
+
+  // Kept for pct calculations (same-currency items only skew when mixed, acceptable)
   const totalSavings = goals.reduce((s, g) => s + Number(g.current_amount), 0);
   const totalDebt = debts.reduce(
     (s, d) => s + (Number(d.total_amount) - Number(d.paid_amount)),
     0,
   );
 
-  // Nearest goal = highest completion %
+  // Active = debts with remaining balance
+  const activeDebts = debts.filter(
+    (d) => roundAmt(Number(d.paid_amount)) < roundAmt(Number(d.total_amount))
+  );
+
+  // In-progress goals (current < target)
+  const inProgressGoals = goals.filter((g) =>
+    g.target_amount > 0
+      ? roundAmt(Number(g.current_amount)) < roundAmt(Number(g.target_amount))
+      : true,
+  );
+
+  // Nearest goal = highest completion % among in-progress only
   const nearestGoal =
-    goals.length > 0
-      ? goals.reduce((best, g) =>
+    inProgressGoals.length > 0
+      ? inProgressGoals.reduce((best, g) =>
           g.current_amount / g.target_amount >
           best.current_amount / best.target_amount
             ? g
@@ -1075,7 +1372,7 @@ export default function Metas() {
         <section className="flex flex-col gap-3">
           {/* Ahorro Total — full width */}
           <div className="bg-primary-container text-on-primary-container rounded-3xl p-6 flex items-center justify-between relative overflow-hidden shadow-card">
-            <div className="absolute top-0 right-0 w-56 h-56 bg-primary-fixed opacity-30 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary-fixed opacity-15 rounded-full blur-2xl -mr-4 -mt-4 pointer-events-none" />
             <div className="relative z-10 flex flex-col gap-1">
               <div className="flex items-center gap-2 opacity-90">
                 <PiggyBank size={16} />
@@ -1083,8 +1380,16 @@ export default function Metas() {
                   Ahorro Total
                 </span>
               </div>
-              <div className="text-4xl font-bold font-currency mt-1">
-                {loadingGoals ? "—" : fmtAmt(totalSavings, "USD")}
+              <div className="flex flex-col gap-0.5 mt-1">
+                {loadingGoals ? (
+                  <span className="text-4xl font-bold font-currency">—</span>
+                ) : savingsByCur.length === 0 ? (
+                  <span className="text-4xl font-bold font-currency">$0</span>
+                ) : savingsByCur.map(([cur, amt]) => (
+                  <span key={cur} className={savingsByCur.length === 1 ? "text-4xl font-bold font-currency" : "text-2xl font-bold font-currency"}>
+                    {fmtAmt(amt, cur)}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -1140,13 +1445,21 @@ export default function Metas() {
                   <div className="text-[10px] font-semibold text-on-surface-variant mb-0.5 uppercase tracking-wide">
                     Total Deudas
                   </div>
-                  <div className="text-sm font-bold text-error truncate">
-                    {loadingDebts ? "—" : fmtAmt(totalDebt, "USD")}
+                  <div className="flex flex-col gap-0.5">
+                    {loadingDebts ? (
+                      <span className="text-sm font-bold text-error">—</span>
+                    ) : debtRemByCur.length === 0 ? (
+                      <span className="text-sm font-bold text-error">$0</span>
+                    ) : debtRemByCur.map(([cur, amt]) => (
+                      <span key={cur} className="text-sm font-bold text-error truncate font-currency">
+                        {fmtAmt(amt, cur)}
+                      </span>
+                    ))}
                   </div>
                   <div className="text-xs font-semibold text-on-surface-variant mt-0.5">
                     {loadingDebts
                       ? ""
-                      : `${debts.length} deuda${debts.length !== 1 ? "s" : ""} activa${debts.length !== 1 ? "s" : ""}`}
+                      : `${activeDebts.length} deuda${activeDebts.length !== 1 ? "s" : ""} activa${activeDebts.length !== 1 ? "s" : ""}`}
                   </div>
                 </div>
               </div>
@@ -1182,7 +1495,7 @@ export default function Metas() {
                 Metas de Ahorro
               </h2>
               <span className="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded-full text-[10px] font-bold">
-                {goals.length} Activas
+                {inProgressGoals.length} en progreso
               </span>
             </div>
             <button
@@ -1192,18 +1505,57 @@ export default function Metas() {
               <Plus size={15} />
             </button>
           </div>
+          {/* Filter chips */}
+          {goals.length > 0 && (
+            <div className="flex gap-2">
+              {[
+                { key: "progress",  label: "En progreso" },
+                { key: "completed", label: "Completadas"  },
+                { key: "all",       label: "Todas"        },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setGoalFilter(key)}
+                  className={[
+                    "px-3 py-1 rounded-full text-xs font-semibold transition-colors",
+                    goalFilter === key
+                      ? key === "progress"
+                        ? "bg-primary-container text-on-primary-container"
+                        : key === "completed"
+                          ? "bg-success/15 text-success"
+                          : "bg-surface-container-high text-on-surface"
+                      : "bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low",
+                  ].join(" ")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {loadingGoals ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 size={24} className="animate-spin text-primary" />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {goals.map((g) => (
+              {goals
+                .filter((g) => {
+                  const completed =
+                    g.target_amount > 0
+                      ? roundAmt(Number(g.current_amount)) >= roundAmt(Number(g.target_amount))
+                      : false;
+                  if (goalFilter === "progress")  return !completed;
+                  if (goalFilter === "completed") return completed;
+                  return true;
+                })
+                .map((g) => (
                 <GoalCard
                   key={g.id}
                   goal={g}
                   onDelete={deleteGoal}
                   onAportar={setAportarGoal}
+                  userName={userName}
                 />
               ))}
               <button
@@ -1225,11 +1577,9 @@ export default function Metas() {
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-on-surface">
-                Mis Deudas
-              </h2>
+              <h2 className="text-base font-bold text-on-surface">Mis Deudas</h2>
               <span className="bg-error-container text-on-error-container px-2 py-0.5 rounded-full text-[10px] font-bold">
-                {debts.length} activas
+                {activeDebts.length} activas
               </span>
             </div>
             <button
@@ -1240,24 +1590,59 @@ export default function Metas() {
             </button>
           </div>
 
+          {/* Filter chips */}
           {debts.length > 0 && (
-            <div className="bg-error-container/30 border border-error-container rounded-2xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+            <div className="flex gap-2">
+              {[
+                { key: "active", label: "Activas" },
+                { key: "paid",   label: "Pagadas" },
+                { key: "all",    label: "Todas" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setDebtFilter(key)}
+                  className={[
+                    "px-3 py-1 rounded-full text-xs font-semibold transition-colors",
+                    debtFilter === key
+                      ? key === "active"
+                        ? "bg-error-container text-on-error-container"
+                        : key === "paid"
+                          ? "bg-success/15 text-success"
+                          : "bg-surface-container-high text-on-surface"
+                      : "bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low",
+                  ].join(" ")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {debts.length > 0 && (
+            <div className="bg-error-container/30 border border-error-container rounded-2xl p-4 flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-0.5">
+                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-1">
                   Deuda Total Pendiente
                 </p>
-                <p className="text-2xl font-bold text-error font-currency mt-0.5">
-                  {fmtAmt(totalDebt, "USD")}
-                </p>
+                {debtRemByCur.length === 0
+                  ? <p className="text-2xl font-bold text-error font-currency">$0</p>
+                  : debtRemByCur.map(([cur, amt]) => (
+                      <p key={cur} className={`font-bold text-error font-currency ${debtRemByCur.length === 1 ? "text-2xl" : "text-lg"}`}>
+                        {fmtAmt(amt, cur)}
+                      </p>
+                    ))
+                }
               </div>
-              <div className="text-right">
-                <p className="text-xs text-on-surface-variant">Pagado</p>
-                <p className="text-sm font-bold text-success font-currency">
-                  {fmtAmt(
-                    debts.reduce((s, d) => s + Number(d.paid_amount), 0),
-                    "USD",
-                  )}
-                </p>
+              <div className="text-right shrink-0 flex flex-col gap-0.5">
+                <p className="text-xs text-on-surface-variant mb-1">Pagado</p>
+                {debtPaidByCur.length === 0
+                  ? <p className="text-sm font-bold text-success font-currency">$0</p>
+                  : debtPaidByCur.map(([cur, amt]) => (
+                      <p key={cur} className="text-sm font-bold text-success font-currency">
+                        {fmtAmt(amt, cur)}
+                      </p>
+                    ))
+                }
               </div>
             </div>
           )}
@@ -1268,12 +1653,20 @@ export default function Metas() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {debts.map((d) => (
+              {debts
+                .filter((d) => {
+                  const settled = roundAmt(Number(d.paid_amount)) >= roundAmt(Number(d.total_amount));
+                  if (debtFilter === "active") return !settled;
+                  if (debtFilter === "paid")   return settled;
+                  return true;
+                })
+                .map((d) => (
                 <DebtCard
                   key={d.id}
                   debt={d}
                   onDelete={deleteDebt}
                   onAbonar={setAbonarDebt}
+                  onHistory={setHistoryDebt}
                 />
               ))}
               <button
@@ -1375,6 +1768,12 @@ export default function Metas() {
         debt={abonarDebt}
         onClose={() => setAbonarDebt(null)}
         onSave={updateDebt}
+        onPayment={addDebtPayment}
+      />
+      <DebtHistorySheet
+        open={!!historyDebt}
+        debt={historyDebt}
+        onClose={() => setHistoryDebt(null)}
       />
     </div>
   );

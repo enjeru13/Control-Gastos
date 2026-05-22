@@ -88,7 +88,22 @@ export function useDebts() {
     await fetch();
   }
 
-  return { ...state, addDebt, updateDebt, deleteDebt, refetch: fetch };
+  async function addDebtPayment(debtId, { amount, notes, date }) {
+    if (!user) return false;
+    const { error } = await supabase
+      .from("debt_payments")
+      .insert({
+        debt_id: debtId,
+        user_id: user.id,
+        amount,
+        notes: notes || null,
+        date: date || new Date().toISOString().slice(0, 10),
+      });
+    if (error) throw error;
+    return true;
+  }
+
+  return { ...state, addDebt, updateDebt, deleteDebt, addDebtPayment, refetch: fetch };
 }
 
 // ── Wishlist ───────────────────────────────────────────────

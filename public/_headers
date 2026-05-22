@@ -1,0 +1,8 @@
+# Service worker must never be cached — browser must always fetch latest
+/sw.js
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Pragma: no-cache
+
+# Workbox runtime (hash in filename = already cache-busted, keep immutable)
+/workbox-*.js
+  Cache-Control: public, max-age=31536000, immutable

@@ -170,7 +170,7 @@ function PasswordForm({ open, onClose }) {
               type="password"
               value={form[field]}
               onChange={(e) => { setError(""); setForm((f) => ({ ...f, [field]: e.target.value })); }}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-base text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
               placeholder="••••••••"
             />
           </div>
