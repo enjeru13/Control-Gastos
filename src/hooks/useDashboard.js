@@ -38,7 +38,7 @@ export function useDashboard() {
         .eq("user_id", user.id)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(200),
 
       supabase
         .from("debts")

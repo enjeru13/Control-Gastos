@@ -6,23 +6,25 @@ import {
   TrendingUp,
   ArrowDown,
   ArrowUp,
+  ChevronDown,
 } from "lucide-react";
 
 // ── Currency Calculator ────────────────────────────────────
 
 const CURRENCIES = ["USD", "VES", "COP", "EUR"];
 
-// VES not on frankfurter — manual fallback (user can update)
-const VES_MANUAL_RATES = { USD: 36.5, COP: 0.0095, EUR: 39.8 };
-
 const ratesInitial = { rates: {}, loading: false, lastUpdated: null };
 
 function ratesReducer(state, action) {
   switch (action.type) {
-    case "FETCH_START":  return { ...state, loading: true };
-    case "FETCH_OK":     return { loading: false, rates: action.rates, lastUpdated: action.ts };
-    case "FETCH_FAIL":   return { loading: false, rates: action.fallback, lastUpdated: null };
-    default:             return state;
+    case "FETCH_START":
+      return { ...state, loading: true };
+    case "FETCH_OK":
+      return { loading: false, rates: action.rates, lastUpdated: action.ts };
+    case "FETCH_FAIL":
+      return { loading: false, rates: action.fallback, lastUpdated: null };
+    default:
+      return state;
   }
 }
 
@@ -30,24 +32,35 @@ function useCurrencyRates(base) {
   const [state, dispatch] = useReducer(ratesReducer, ratesInitial);
 
   useEffect(() => {
-    if (base === "VES") return;
     dispatch({ type: "FETCH_START" });
-    fetch(`https://api.frankfurter.app/latest?from=${base}&to=USD,COP,EUR,VES`)
+
+    // Nueva API de ExchangeRate que soporta todas las monedas y no da error de CORS
+    fetch(`https://open.er-api.com/v6/latest/${base}`)
       .then((r) => r.json())
       .then((data) => {
-        const r = { ...data.rates };
-        if (!r.VES)
-          r.VES = base === "USD" ? 36.5 : (data.rates.USD ?? 1) * 36.5;
-        dispatch({ type: "FETCH_OK", rates: r, ts: new Date() });
+        if (data.result === "success") {
+          // Extraemos solo las monedas que nos interesan del listado global
+          const r = {
+            USD: data.rates.USD,
+            VES: data.rates.VES,
+            COP: data.rates.COP,
+            EUR: data.rates.EUR,
+          };
+          dispatch({ type: "FETCH_OK", rates: r, ts: new Date() });
+        } else {
+          throw new Error("Error en la respuesta de la API");
+        }
       })
-      .catch(() => {
-        dispatch({ type: "FETCH_FAIL", fallback: { USD: 1, COP: 3850, EUR: 0.93, VES: 36.5 } });
+      .catch((error) => {
+        console.error("Fallo al obtener tasas:", error);
+        // Valores de emergencia por si el usuario se queda sin internet
+        dispatch({
+          type: "FETCH_FAIL",
+          fallback: { USD: 1, COP: 3850, EUR: 0.93, VES: 36.5 },
+        });
       });
   }, [base]);
 
-  if (base === "VES") {
-    return { rates: VES_MANUAL_RATES, loading: false, lastUpdated: null };
-  }
   return state;
 }
 
@@ -55,11 +68,13 @@ function CurrencyCalculator() {
   const [amount, setAmount] = useState("100");
   const [from, setFrom] = useState("USD");
   const [to, setTo] = useState("COP");
+
   const { rates, loading, lastUpdated } = useCurrencyRates(from);
 
   const result = rates[to]
     ? (parseFloat(amount || 0) * rates[to]).toFixed(2)
     : "—";
+
   const rateLabel = rates[to]
     ? `1 ${from} = ${new Intl.NumberFormat("es-VE", { maximumFractionDigits: 4 }).format(rates[to])} ${to}`
     : "...";
@@ -70,85 +85,122 @@ function CurrencyCalculator() {
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-base font-bold text-on-surface">
-        Calculadora de Divisas
-      </h2>
-
-      <div className="bg-surface rounded-2xl shadow-card p-5 flex flex-col gap-4 relative">
-        {/* Swap center button */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-          <button
-            onClick={swap}
-            className="w-8 h-8 bg-surface-container-high rounded-full flex items-center justify-center shadow-sm border border-surface-container-lowest text-primary hover:bg-primary-container transition-colors active:scale-90"
-          >
-            <ArrowLeftRight size={14} />
-          </button>
-        </div>
-
-        {/* From */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-            Monto a convertir
-          </label>
-          <div className="flex bg-surface-container-low border border-outline-variant rounded-xl overflow-hidden h-14 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="flex-1 bg-transparent border-none focus:ring-0 text-lg font-bold text-on-surface px-4 outline-none font-currency"
-              placeholder="0.00"
-            />
-            <CurrencyDropdown value={from} onChange={setFrom} exclude={to} />
+    <section className="flex flex-col gap-5">
+      {/* Header Premium */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner">
+            <TrendingUp size={22} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-on-surface tracking-tight">
+              Conversor
+            </h2>
+            <p className="text-[11px] font-bold text-outline uppercase tracking-widest mt-0.5">
+              Tasas en tiempo real
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* To */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-            Monto estimado
-          </label>
-          <div className="flex bg-surface-container-low border border-outline-variant rounded-xl overflow-hidden h-14 transition-all">
-            <input
-              readOnly
-              value={loading ? "..." : result}
-              className="flex-1 bg-transparent border-none focus:ring-0 text-lg font-bold text-on-surface px-4 outline-none font-currency"
-            />
-            <CurrencyDropdown value={to} onChange={setTo} exclude={from} />
+      {/* Contenedor Principal Glassmorphism */}
+      <div className="relative w-full rounded-[2.5rem] bg-surface shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-outline-variant/30 p-2 sm:p-3 overflow-hidden">
+        {/* Luces de fondo (Blobs para efecto neón suave) */}
+        <div className="absolute -top-20 -right-20 w-72 h-72 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-secondary/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative flex flex-col gap-2 z-10">
+          {/* ENVIAS CARD */}
+          <div className="group bg-surface-container-highest/20 backdrop-blur-xl border border-outline-variant/30 rounded-4xl p-5 pt-6 pb-9 transition-all duration-300 focus-within:bg-surface focus-within:border-outline focus-within:shadow-xl">
+            <label className="flex items-center gap-2 text-[12px] font-bold text-on-surface-variant uppercase tracking-widest mb-4 ml-2">
+              <span className="w-2 h-2 rounded-full bg-outline-variant/50 group-focus-within:bg-primary transition-colors"></span>
+              Tú envías
+            </label>
+            <div className="flex justify-between items-center gap-4">
+              <CurrencyDropdown value={from} onChange={setFrom} exclude={to} />
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="flex-1 w-full bg-transparent border-none focus:ring-0 text-4xl sm:text-5xl font-black text-on-surface outline-none text-right placeholder-on-surface-variant/20 tracking-tighter"
+                placeholder="0"
+              />
+            </div>
           </div>
-          <div className="flex justify-between text-xs text-outline mt-0.5 px-1">
-            <span>{loading ? "Actualizando..." : rateLabel}</span>
-            <button
-              onClick={swap}
-              className="text-primary font-semibold hover:underline"
-            >
-              Invertir
-            </button>
+
+          {/* BOTON SWAP (Flotante) */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+            {/* Este div hace el "corte" entre las dos tarjetas */}
+            <div className="bg-surface p-1.5 rounded-full shadow-lg">
+              <button
+                onClick={swap}
+                className="group w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 active:scale-90 transition-all duration-300 shadow-[0_0_20px_rgba(var(--color-primary),0.4)]"
+              >
+                <ArrowLeftRight
+                  size={24}
+                  strokeWidth={2.5}
+                  className="rotate-90 group-hover:rotate-270 transition-transform duration-500"
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* RECIBES CARD */}
+          <div className="bg-linear-to-br from-primary/10 to-primary/5 border border-primary/20 backdrop-blur-xl rounded-4xl p-5 pt-9 pb-6 transition-all relative overflow-hidden">
+            {/* Brillo interno */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex justify-between items-start mb-4 ml-2">
+              <label className="flex items-center gap-2 text-[12px] font-bold text-primary uppercase tracking-widest">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                Tú recibes
+              </label>
+              <div className="bg-surface/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-primary/15 shadow-sm">
+                <span className="text-[11px] font-bold text-primary">
+                  {loading ? "Calculando..." : rateLabel}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center gap-4 relative z-10">
+              <CurrencyDropdown value={to} onChange={setTo} exclude={from} />
+              <input
+                readOnly
+                value={loading ? "" : result}
+                className="flex-1 w-full bg-transparent border-none focus:ring-0 text-4xl sm:text-5xl font-black text-primary outline-none text-right truncate placeholder-primary/30 tracking-tighter"
+                placeholder="0.00"
+              />
+            </div>
           </div>
         </div>
+      </div>
 
-        {lastUpdated && (
-          <div className="flex items-center gap-1.5 text-[10px] text-outline">
-            <TrendingUp size={11} />
-            Tasa actualizada:{" "}
+      {/* Footer minimalista */}
+      {lastUpdated && (
+        <div className="flex justify-center mt-1">
+          <span className="text-[10px] font-semibold text-outline-variant/80 uppercase tracking-widest">
+            Actualizado ·{" "}
             {lastUpdated.toLocaleTimeString("es", {
               hour: "2-digit",
               minute: "2-digit",
             })}
-          </div>
-        )}
-      </div>
+          </span>
+        </div>
+      )}
     </section>
   );
 }
 
 function CurrencyDropdown({ value, onChange, exclude }) {
   return (
-    <div className="flex items-center bg-surface-container px-3 border-l border-outline-variant">
+    <div className="relative group shrink-0">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent border-none text-sm font-bold text-on-surface outline-none cursor-pointer appearance-none pr-1"
+        className="appearance-none bg-surface text-on-surface font-black text-xl rounded-2xl py-3 pl-5 pr-12 cursor-pointer outline-none shadow-sm border border-outline-variant/30 focus:border-primary focus:ring-4 focus:ring-primary/15 hover:border-primary/50 hover:shadow-md transition-all z-10 relative"
       >
         {CURRENCIES.filter((c) => c !== exclude).map((c) => (
           <option key={c} value={c}>
@@ -156,6 +208,10 @@ function CurrencyDropdown({ value, onChange, exclude }) {
           </option>
         ))}
       </select>
+      {/* Flecha personalizada */}
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-outline-variant group-hover:text-primary transition-colors z-20">
+        <ChevronDown size={20} strokeWidth={3} />
+      </div>
     </div>
   );
 }
@@ -206,6 +262,7 @@ function FinancialCalendar() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
+
   const [selected, setSelected] = useState(
     dateKey(today.getFullYear(), today.getMonth(), today.getDate()),
   );
@@ -223,6 +280,7 @@ function FinancialCalendar() {
       setViewMonth(11);
     } else setViewMonth((m) => m - 1);
   }
+
   function nextMonth() {
     if (viewMonth === 11) {
       setViewYear((y) => y + 1);
@@ -292,10 +350,12 @@ function FinancialCalendar() {
             const day = i + 1;
             const key = dateKey(viewYear, viewMonth, day);
             const dots = TX_DOTS[key] ?? [];
+
             const isToday =
               day === today.getDate() &&
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
+
             const isSelected = key === selected;
 
             return (

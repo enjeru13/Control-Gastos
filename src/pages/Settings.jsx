@@ -12,8 +12,10 @@ import {
   LogOut,
   Edit2,
 } from "lucide-react";
+import { Switch } from "@headlessui/react";
 import { CURRENCIES } from "../constants/currencies";
 import { useAuth } from "../contexts/AuthContext";
+import BottomSheet from "../components/ui/BottomSheet";
 
 // ── Dark mode hook ────────────────────────────────────────
 
@@ -34,24 +36,18 @@ function useDarkMode() {
 
 function Toggle({ checked, onChange, disabled = false }) {
   return (
-    <button
-      role="switch"
-      aria-checked={checked}
+    <Switch
+      checked={checked}
+      onChange={onChange}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
       className={[
-        "relative w-12 h-6 rounded-full transition-colors duration-300 shrink-0",
-        checked ? "bg-primary" : "bg-surface-variant",
+        "group relative w-12 h-6 rounded-full transition-colors duration-300 shrink-0",
+        "bg-surface-variant data-[checked]:bg-primary",
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
       ].join(" ")}
     >
-      <span
-        className={[
-          "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300",
-          checked ? "left-6.5" : "left-0.5",
-        ].join(" ")}
-      />
-    </button>
+      <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 group-data-[checked]:translate-x-6" />
+    </Switch>
   );
 }
 
@@ -105,57 +101,39 @@ function SettingRow({
 
 // ── Currency picker modal ─────────────────────────────────
 
-function CurrencyPicker({ current, onSelect, onClose }) {
+function CurrencyPicker({ open, current, onSelect, onClose }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-3xl bg-surface rounded-t-3xl p-6 pb-10 shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-5" />
-        <h3 className="text-base font-bold text-on-surface mb-4">
-          Moneda Principal
-        </h3>
-        <div className="flex flex-col gap-1">
-          {CURRENCIES.map(({ code, name, symbol, flag }) => (
-            <button
-              key={code}
-              onClick={() => {
-                onSelect(code);
-                onClose();
-              }}
-              className={[
-                "flex items-center gap-4 p-4 rounded-xl transition-colors",
-                current === code
-                  ? "bg-primary-container text-on-primary-container"
-                  : "hover:bg-surface-container-low text-on-surface",
-              ].join(" ")}
-            >
-              <span className="text-2xl">{flag}</span>
-              <div className="text-left flex-1">
-                <p className="text-sm font-bold">
-                  {code} — {symbol}
-                </p>
-                <p className="text-xs opacity-70">{name}</p>
-              </div>
-              {current === code && (
-                <div className="w-2 h-2 rounded-full bg-primary" />
-              )}
-            </button>
-          ))}
-        </div>
+    <BottomSheet open={open} title="Moneda Principal" onClose={onClose}>
+      <div className="flex flex-col gap-1">
+        {CURRENCIES.map(({ code, name, symbol, flag }) => (
+          <button
+            key={code}
+            onClick={() => { onSelect(code); onClose(); }}
+            className={[
+              "flex items-center gap-4 p-4 rounded-xl transition-colors",
+              current === code
+                ? "bg-primary-container text-on-primary-container"
+                : "hover:bg-surface-container-low text-on-surface",
+            ].join(" ")}
+          >
+            <span className="text-2xl">{flag}</span>
+            <div className="text-left flex-1">
+              <p className="text-sm font-bold">{code} — {symbol}</p>
+              <p className="text-xs opacity-70">{name}</p>
+            </div>
+            {current === code && (
+              <div className="w-2 h-2 rounded-full bg-primary" />
+            )}
+          </button>
+        ))}
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 
 // ── Change password form ──────────────────────────────────
 
-function PasswordForm({ onClose }) {
+function PasswordForm({ open, onClose }) {
   const { updatePassword } = useAuth();
   const [form, setForm] = useState({ next: "", confirm: "" });
   const [error, setError] = useState("");
@@ -164,8 +142,7 @@ function PasswordForm({ onClose }) {
   async function handle(e) {
     e.preventDefault();
     if (form.next.length < 8) return setError("Mínimo 8 caracteres");
-    if (form.next !== form.confirm)
-      return setError("Las contraseñas no coinciden");
+    if (form.next !== form.confirm) return setError("Las contraseñas no coinciden");
     setSaving(true);
     try {
       await updatePassword(form.next);
@@ -179,51 +156,35 @@ function PasswordForm({ onClose }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-3xl bg-surface rounded-t-3xl p-6 pb-10 shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-5" />
-        <h3 className="text-base font-bold text-on-surface mb-5">
-          Cambiar Contraseña
-        </h3>
-        <form onSubmit={handle} className="flex flex-col gap-4">
-          {[
-            ["next", "Nueva contraseña"],
-            ["confirm", "Confirmar contraseña"],
-          ].map(([field, label]) => (
-            <div key={field} className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
-                {label}
-              </label>
-              <input
-                type="password"
-                value={form[field]}
-                onChange={(e) => {
-                  setError("");
-                  setForm((f) => ({ ...f, [field]: e.target.value }));
-                }}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-          ))}
-          {error && <p className="text-xs text-error">{error}</p>}
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full py-4 rounded-xl bg-linear-to-b from-primary to-surface-tint text-on-primary text-sm font-bold shadow-card mt-2 active:scale-[0.98] transition-all disabled:opacity-60"
-          >
-            {saving ? "Guardando..." : "Actualizar Contraseña"}
-          </button>
-        </form>
-      </div>
-    </div>
+    <BottomSheet open={open} title="Cambiar Contraseña" onClose={onClose}>
+      <form onSubmit={handle} className="flex flex-col gap-4">
+        {[
+          ["next", "Nueva contraseña"],
+          ["confirm", "Confirmar contraseña"],
+        ].map(([field, label]) => (
+          <div key={field} className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-on-surface-variant tracking-wide">
+              {label}
+            </label>
+            <input
+              type="password"
+              value={form[field]}
+              onChange={(e) => { setError(""); setForm((f) => ({ ...f, [field]: e.target.value })); }}
+              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+              placeholder="••••••••"
+            />
+          </div>
+        ))}
+        {error && <p className="text-xs text-error">{error}</p>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-4 rounded-xl bg-linear-to-b from-primary to-surface-tint text-on-primary text-sm font-bold shadow-card active:scale-[0.98] transition-all disabled:opacity-60"
+        >
+          {saving ? "Guardando..." : "Actualizar Contraseña"}
+        </button>
+      </form>
+    </BottomSheet>
   );
 }
 
@@ -363,7 +324,7 @@ export default function Settings() {
               onClick={() => setShowCurrencyPicker(true)}
               trailing={
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-primary bg-primary-fixed/50 px-3 py-1 rounded-full">
+                  <span className="text-sm font-bold text-on-primary-container bg-primary-container px-3 py-1 rounded-full">
                     {selectedCurrency?.flag} {currency}
                   </span>
                   <ChevronRight size={16} className="text-on-surface-variant" />
@@ -475,16 +436,16 @@ export default function Settings() {
       </div>
 
       {/* ── Modals ── */}
-      {showCurrencyPicker && (
-        <CurrencyPicker
-          current={currency}
-          onSelect={(code) => { setCurrency(code); updateCurrency(code); toast.success(`Moneda cambiada a ${code}`); }}
-          onClose={() => setShowCurrencyPicker(false)}
-        />
-      )}
-      {showPasswordForm && (
-        <PasswordForm onClose={() => setShowPasswordForm(false)} />
-      )}
+      <CurrencyPicker
+        open={showCurrencyPicker}
+        current={currency}
+        onSelect={(code) => { setCurrency(code); updateCurrency(code); toast.success(`Moneda cambiada a ${code}`); }}
+        onClose={() => setShowCurrencyPicker(false)}
+      />
+      <PasswordForm
+        open={showPasswordForm}
+        onClose={() => setShowPasswordForm(false)}
+      />
     </>
   );
 }

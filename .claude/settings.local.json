@@ -5,7 +5,10 @@
       "Bash(npm run *)",
       "Bash(npm list *)",
       "Bash(grep -n \"pwa\\\\|registerSW\\\\|workbox\" vite.config.js)",
-      "Bash(grep -rn \"registerSW\\\\|useRegisterSW\" src/)"
+      "Bash(grep -rn \"registerSW\\\\|useRegisterSW\" src/)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@headlessui/react/package.json'\\).version\\)\")",
+      "Bash(npx vite *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }

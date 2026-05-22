@@ -3,10 +3,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { getCurrencySymbol } from "../lib/currency";
 import { getIcon } from "../lib/categoryIcons";
 import { useCategories, useTransactions } from "../hooks/useTransactions";
+import BottomSheet from "../components/ui/BottomSheet";
 
 const CURRENCIES = ["USD", "VES", "COP"];
 
@@ -66,6 +67,8 @@ export default function Transactions() {
   const [txType, setTxType] = useState("expense");
   const [currency, setCurrency] = useState("USD");
   const [filter, setFilter] = useState("all");
+  const [selectedTx, setSelectedTx] = useState(null); // tx object → action sheet
+  const [deleting, setDeleting] = useState(false);
 
   const { categories } = useCategories();
   const {
@@ -73,6 +76,7 @@ export default function Transactions() {
     loading: loadingTxs,
     saving,
     addTransaction,
+    deleteTransaction,
   } = useTransactions();
 
   // Split categories by type
@@ -111,22 +115,33 @@ export default function Transactions() {
     }
   }
 
+  async function handleDelete() {
+    if (!selectedTx) return;
+    setDeleting(true);
+    const ok = await deleteTransaction(selectedTx.id);
+    setDeleting(false);
+    if (ok) {
+      toast.success("Movimiento eliminado");
+      setSelectedTx(null);
+    } else {
+      toast.error("Error al eliminar");
+    }
+  }
+
   const filtered = transactions.filter(
     (tx) => filter === "all" || tx.type === filter,
   );
   const grouped = groupByDate(filtered);
 
   return (
+    <>
     <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
       {/* ── FORM ── */}
       <section className="md:col-span-2 flex flex-col gap-0">
         <div className="bg-surface rounded-2xl shadow-card p-5 flex flex-col gap-5 relative overflow-hidden">
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-secondary-container rounded-full blur-3xl opacity-40 pointer-events-none" />
 
-          <div className="flex items-center gap-2.5 relative z-10">
-            <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center text-sm font-bold">
-              +
-            </div>
+          <div className="flex items-center justify-center gap-2.5 relative z-10">
             <h2 className="text-lg font-bold text-on-surface">Registrar</h2>
           </div>
 
@@ -214,7 +229,7 @@ export default function Transactions() {
               <input
                 {...register("description")}
                 type="text"
-                placeholder="Ej. Almuerzo con cliente"
+                placeholder="Ej. Comida rápida"
                 className={[
                   "w-full bg-surface-container-low border rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all placeholder:text-outline",
                   errors.description
@@ -283,7 +298,7 @@ export default function Transactions() {
               <input
                 {...register("notes")}
                 type="text"
-                placeholder="Ej. Compartido con Juan"
+                placeholder="Ej. Deuda pendiente por cobrar"
                 className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10 placeholder:text-outline"
               />
             </div>
@@ -380,7 +395,8 @@ export default function Transactions() {
                     return (
                       <div
                         key={tx.id}
-                        className="flex items-center justify-between p-3 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
+                        onClick={() => setSelectedTx(tx)}
+                        className="flex items-center justify-between p-3 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer active:scale-[0.98]"
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -404,8 +420,8 @@ export default function Transactions() {
                             className={[
                               "text-sm font-bold font-currency",
                               tx.type === "income"
-                                ? "text-primary"
-                                : "text-on-surface",
+                                ? "text-success"
+                                : "text-error",
                             ].join(" ")}
                           >
                             {tx.type === "income" ? "+" : "-"}
@@ -425,5 +441,57 @@ export default function Transactions() {
         </div>
       </section>
     </div>
+
+    <BottomSheet
+      open={!!selectedTx}
+      title="Movimiento"
+      onClose={() => setSelectedTx(null)}
+    >
+      {selectedTx && (() => {
+        const cat = selectedTx.categories;
+        const Icon = getIcon(cat?.icon);
+        const color = cat?.color ?? "#6b7280";
+        return (
+          <div className="flex flex-col gap-4">
+            {/* Summary */}
+            <div className="flex items-center gap-3 bg-surface-container-low rounded-2xl p-4">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: color + "1a" }}
+              >
+                <Icon size={20} style={{ color }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-on-surface truncate">
+                  {selectedTx.description}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {cat?.name ?? "Sin categoría"} · {selectedTx.date}
+                </p>
+              </div>
+              <span className={[
+                "text-base font-bold font-currency shrink-0",
+                selectedTx.type === "income" ? "text-success" : "text-error",
+              ].join(" ")}>
+                {selectedTx.type === "income" ? "+" : "-"}{formatAmt(selectedTx.amount)} {selectedTx.currency}
+              </span>
+            </div>
+
+            {/* Delete */}
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="w-full py-4 rounded-xl bg-error-container text-on-error-container text-sm font-bold flex items-center justify-center gap-2 hover:bg-error hover:text-on-error transition-colors active:scale-[0.98] disabled:opacity-60"
+            >
+              {deleting
+                ? <Loader2 size={16} className="animate-spin" />
+                : <Trash2 size={16} />}
+              {deleting ? "Eliminando..." : "Eliminar movimiento"}
+            </button>
+          </div>
+        );
+      })()}
+    </BottomSheet>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { Menu, MenuButton, MenuItems, MenuItem } from "@headlessui/react";
 import {
   Plus,
   MoreVertical,
@@ -765,8 +766,6 @@ function GoalCard({ goal, onDelete, onAportar }) {
   const iconMeta =
     GOAL_ICONS.find((g) => g.name === goal.icon) ?? GOAL_ICONS[6];
   const { Icon, bg: bgColor, color: iconColor } = iconMeta;
-  const [menu, setMenu] = useState(false);
-
   return (
     <div className="bg-surface rounded-2xl p-5 shadow-card border border-surface-container hover:shadow-overlay transition-shadow duration-300 flex flex-col gap-4 relative">
       <div className="flex justify-between items-start">
@@ -782,36 +781,28 @@ function GoalCard({ goal, onDelete, onAportar }) {
             <p className="text-xs text-on-surface-variant">{goal.currency}</p>
           </div>
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setMenu((m) => !m)}
-            className="text-outline hover:text-on-surface transition-colors p-1 -mr-1 -mt-1 rounded-lg hover:bg-surface-container"
-          >
+        <Menu as="div" className="relative">
+          <MenuButton className="text-outline hover:text-on-surface transition-colors p-1 -mr-1 -mt-1 rounded-lg hover:bg-surface-container">
             <MoreVertical size={16} />
-          </button>
-          {menu && (
-            <div className="absolute right-0 top-8 bg-surface border border-surface-container rounded-xl shadow-overlay z-10 overflow-hidden min-w-37.5">
-              <button
-                onClick={() => {
-                  onAportar(goal);
-                  setMenu(false);
-                }}
-                className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary hover:bg-primary-container/20 transition-colors"
-              >
-                <TrendingUp size={14} /> Aportar
-              </button>
-              <button
-                onClick={() => {
-                  onDelete(goal.id);
-                  setMenu(false);
-                }}
-                className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error hover:bg-error-container/20 transition-colors"
-              >
-                <Trash2 size={14} /> Eliminar
-              </button>
-            </div>
-          )}
-        </div>
+          </MenuButton>
+          <MenuItems
+            transition
+            className="absolute right-0 top-8 z-10 bg-surface border border-surface-container rounded-xl shadow-overlay overflow-hidden min-w-37.5 origin-top-right transition duration-150 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
+          >
+            <MenuItem as="button"
+              onClick={() => onAportar(goal)}
+              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
+            >
+              <TrendingUp size={14} /> Aportar
+            </MenuItem>
+            <MenuItem as="button"
+              onClick={() => onDelete(goal.id)}
+              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error data-[focus]:bg-error-container/20 transition-colors"
+            >
+              <Trash2 size={14} /> Eliminar
+            </MenuItem>
+          </MenuItems>
+        </Menu>
       </div>
       <div>
         <div className="flex justify-between items-end mb-2">
@@ -846,8 +837,6 @@ function DebtCard({ debt, onDelete, onAbonar }) {
       : 0;
   const days = daysUntil(debt.due_date);
   const urgent = days !== null && days <= 30;
-  const [menu, setMenu] = useState(false);
-
   return (
     <div className="bg-surface rounded-2xl shadow-card border border-surface-container overflow-hidden hover:shadow-overlay transition-shadow duration-300">
       <div className="flex">
@@ -880,36 +869,28 @@ function DebtCard({ debt, onDelete, onAbonar }) {
                 </div>
               </div>
             </div>
-            <div className="relative">
-              <button
-                onClick={() => setMenu((m) => !m)}
-                className="text-outline hover:text-on-surface transition-colors p-1 rounded-lg hover:bg-surface-container"
-              >
+            <Menu as="div" className="relative">
+              <MenuButton className="text-outline hover:text-on-surface transition-colors p-1 rounded-lg hover:bg-surface-container">
                 <MoreVertical size={16} />
-              </button>
-              {menu && (
-                <div className="absolute right-0 top-8 bg-surface border border-surface-container rounded-xl shadow-overlay z-10 overflow-hidden min-w-41.25">
-                  <button
-                    onClick={() => {
-                      onAbonar(debt);
-                      setMenu(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary hover:bg-primary-container/20 transition-colors"
-                  >
-                    <Receipt size={14} /> Registrar abono
-                  </button>
-                  <button
-                    onClick={() => {
-                      onDelete(debt.id);
-                      setMenu(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error hover:bg-error-container/20 transition-colors"
-                  >
-                    <Trash2 size={14} /> Eliminar
-                  </button>
-                </div>
-              )}
-            </div>
+              </MenuButton>
+              <MenuItems
+                transition
+                className="absolute right-0 top-8 z-10 bg-surface border border-surface-container rounded-xl shadow-overlay overflow-hidden min-w-41.25 origin-top-right transition duration-150 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
+              >
+                <MenuItem as="button"
+                  onClick={() => onAbonar(debt)}
+                  className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
+                >
+                  <Receipt size={14} /> Registrar abono
+                </MenuItem>
+                <MenuItem as="button"
+                  onClick={() => onDelete(debt.id)}
+                  className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error data-[focus]:bg-error-container/20 transition-colors"
+                >
+                  <Trash2 size={14} /> Eliminar
+                </MenuItem>
+              </MenuItems>
+            </Menu>
           </div>
 
           <div className="flex justify-between items-end">
@@ -962,7 +943,6 @@ function DebtCard({ debt, onDelete, onAbonar }) {
 
 function WishlistItem({ item, onDelete, onConvert }) {
   const badge = PRIORITY_BADGE[item.priority] ?? PRIORITY_BADGE.medium;
-  const [menu, setMenu] = useState(false);
 
   return (
     <div className="flex items-center justify-between p-4 rounded-xl hover:bg-surface-container-low transition-colors group border-b border-surface-container-high/50 last:border-0">
@@ -994,36 +974,28 @@ function WishlistItem({ item, onDelete, onConvert }) {
             {fmtAmt(item.price, item.currency)}
           </span>
         )}
-        <div className="relative">
-          <button
-            onClick={() => setMenu((m) => !m)}
-            className="text-outline hover:text-on-surface transition-colors p-1 rounded-lg hover:bg-surface-container"
-          >
+        <Menu as="div" className="relative">
+          <MenuButton className="text-outline hover:text-on-surface transition-colors p-1 rounded-lg hover:bg-surface-container">
             <MoreVertical size={15} />
-          </button>
-          {menu && (
-            <div className="absolute right-0 top-8 bg-surface border border-surface-container rounded-xl shadow-overlay z-10 overflow-hidden min-w-42.5">
-              <button
-                onClick={() => {
-                  onConvert(item);
-                  setMenu(false);
-                }}
-                className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary hover:bg-primary-container/20 transition-colors"
-              >
-                <PiggyBank size={14} /> Convertir en meta
-              </button>
-              <button
-                onClick={() => {
-                  onDelete(item.id);
-                  setMenu(false);
-                }}
-                className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error hover:bg-error-container/20 transition-colors"
-              >
-                <Trash2 size={14} /> Eliminar
-              </button>
-            </div>
-          )}
-        </div>
+          </MenuButton>
+          <MenuItems
+            transition
+            className="absolute right-0 top-8 z-10 bg-surface border border-surface-container rounded-xl shadow-overlay overflow-hidden min-w-42.5 origin-top-right transition duration-150 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
+          >
+            <MenuItem as="button"
+              onClick={() => onConvert(item)}
+              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-primary data-[focus]:bg-primary-container/20 transition-colors"
+            >
+              <PiggyBank size={14} /> Convertir en meta
+            </MenuItem>
+            <MenuItem as="button"
+              onClick={() => onDelete(item.id)}
+              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-error data-[focus]:bg-error-container/20 transition-colors"
+            >
+              <Trash2 size={14} /> Eliminar
+            </MenuItem>
+          </MenuItems>
+        </Menu>
       </div>
     </div>
   );

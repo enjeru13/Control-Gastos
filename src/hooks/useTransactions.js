@@ -83,12 +83,50 @@ export function useTransactions() {
     return true;
   }
 
+  async function deleteTransaction(id) {
+    if (!user) return false;
+    dispatch({ type: "SAVE_START" });
+    const { error } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      dispatch({ type: "SAVE_ERROR", error: error.message });
+      return false;
+    }
+    dispatch({ type: "FETCH_OK", data: state.transactions.filter((t) => t.id !== id) });
+    dispatch({ type: "SAVE_OK" });
+    return true;
+  }
+
+  async function updateTransaction(id, changes) {
+    if (!user) return false;
+    dispatch({ type: "SAVE_START" });
+    const { error } = await supabase
+      .from("transactions")
+      .update(changes)
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      dispatch({ type: "SAVE_ERROR", error: error.message });
+      return false;
+    }
+    await fetch();
+    dispatch({ type: "SAVE_OK" });
+    return true;
+  }
+
   return {
     transactions: state.transactions,
     loading:      state.loading,
     saving:       state.saving,
     error:        state.error,
     addTransaction,
+    deleteTransaction,
+    updateTransaction,
     refetch: fetch,
   };
 }

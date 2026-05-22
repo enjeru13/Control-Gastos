@@ -5,8 +5,8 @@ import BottomNav from "./BottomNav";
 import PageTransition from "./PageTransition";
 import UpdatePrompt from "../ui/UpdatePrompt";
 
-const PULL_THRESHOLD = 72;
-const PULL_MAX = 100;
+const PULL_THRESHOLD = 80; // Un poco más largo para evitar recargos accidentales
+const PULL_MAX = 120;
 
 export default function Layout() {
   const [pullY, setPullY] = useState(0);
@@ -23,6 +23,8 @@ export default function Layout() {
   function onTouchMove(e) {
     if (touchStartY.current === null) return;
     const dy = e.touches[0].clientY - touchStartY.current;
+
+    // Solo permitimos el pull si estamos hasta arriba del todo
     if (dy > 0 && mainRef.current?.scrollTop === 0) {
       setPullY(Math.min(dy * 0.45, PULL_MAX));
     }
@@ -33,6 +35,7 @@ export default function Layout() {
       setRefreshing(true);
       setPullY(0);
       touchStartY.current = null;
+      // Damos tiempo a que gire un poco antes de recargar la ventana
       setTimeout(() => window.location.reload(), 600);
     } else {
       setPullY(0);
@@ -41,29 +44,39 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col overflow-hidden">
+    // Agregamos overscroll-none al body/root para evitar que el navegador interfiera
+    <div className="h-dvh w-full bg-background flex flex-col overflow-hidden overscroll-none relative">
       <Header />
 
-      {/* Pull-to-refresh indicator */}
+      {/* Pull-to-refresh indicator (Estilo Nativo Píldora Flotante) */}
       <div
-        className="flex items-center justify-center text-primary overflow-hidden transition-[height] duration-150"
-        style={{ height: refreshing ? 36 : pullY > 0 ? pullY * 0.38 : 0 }}
+        className="absolute left-1/2 z-60 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-surface text-primary shadow-xl ring-1 ring-outline-variant/20 pointer-events-none"
+        style={{
+          // Baja desde arriba de la pantalla. Si está refreshing, se queda fijo a 80px.
+          top: refreshing ? "80px" : "-50px",
+          transform: `translateY(${refreshing ? 0 : pullY * 0.9}px) scale(${Math.min(Math.max(pullY / (PULL_THRESHOLD * 0.8), 0), 1)})`,
+          opacity: pullY > 10 || refreshing ? 1 : 0,
+          transition: refreshing
+            ? "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease"
+            : "none",
+        }}
       >
         <RefreshCw
-          size={16}
+          size={20}
+          strokeWidth={2.5}
           className={refreshing ? "animate-spin" : ""}
           style={{
-            opacity: Math.min(pullY / PULL_THRESHOLD, 1),
-            transform: `rotate(${refreshing ? 0 : pullY * 3}deg)`,
-            transition: "transform 0.05s linear",
+            transform: `rotate(${refreshing ? 0 : pullY * 4}deg)`,
           }}
         />
       </div>
 
+      {/* El main ahora maneja su propio scroll internamente (overflow-y-auto).
+        Esto es clave para el Glassmorphism del BottomNav y Header.
+      */}
       <main
         ref={mainRef}
-        className="flex-1 w-full max-w-3xl mx-auto px-4 py-6"
-        style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom))" }}
+        className="flex-1 w-full max-w-3xl mx-auto px-4 py-6 overflow-y-auto overflow-x-hidden overscroll-none pb-[calc(7rem+env(safe-area-inset-bottom))] scroll-smooth"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
