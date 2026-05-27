@@ -15,6 +15,8 @@ import {
   Gift,
   PlusCircle,
   Tag,
+  Baby,
+  PawPrint,
 } from "lucide-react";
 
 export const ICON_MAP = {
@@ -34,6 +36,8 @@ export const ICON_MAP = {
   Gift,
   PlusCircle,
   Tag,
+  Baby,
+  PawPrint,
 };
 
 export function getIcon(name) {

@@ -9,19 +9,43 @@ export function useCategories() {
     { categories: [], loading: true },
   );
 
-  useEffect(() => {
+  const fetch = useCallback(async () => {
     if (!user) return;
-    supabase
+    const { data } = await supabase
       .from("categories")
       .select("*")
       .or(`user_id.is.null,user_id.eq.${user.id}`)
-      .order("name")
-      .then(({ data }) => {
-        dispatch({ categories: data ?? [], loading: false });
-      });
+      .order("name");
+    dispatch({ categories: data ?? [], loading: false });
   }, [user]);
 
-  return state;
+  useEffect(() => { fetch(); }, [fetch]);
+
+  async function addCategory(payload) {
+    if (!user) return;
+    const { error } = await supabase
+      .from("categories")
+      .insert({ ...payload, user_id: user.id });
+    if (error) throw error;
+    await fetch();
+  }
+
+  async function updateCategory(id, changes) {
+    const { error } = await supabase
+      .from("categories")
+      .update(changes)
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await fetch();
+  }
+
+  async function deleteCategory(id) {
+    await supabase.from("categories").delete().eq("id", id).eq("user_id", user.id);
+    await fetch();
+  }
+
+  return { ...state, addCategory, updateCategory, deleteCategory, refetch: fetch };
 }
 
 const txInitial = { transactions: [], loading: true, saving: false, error: null };
